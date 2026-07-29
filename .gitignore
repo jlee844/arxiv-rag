@@ -1,0 +1,31 @@
+# Data (never commit downloaded PDFs or vector index)
+data/
+*.pdf
+chroma_db/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Env
+.env
+.env.*
+venv/
+.venv/
+env/
+
+# OS
+.DS_Store
+*.swp
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
