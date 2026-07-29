@@ -1,33 +1,47 @@
 """LLM generation with retrieved context.
 
-Backends:
-  - "ollama"  → local model via Ollama (default: llama3.2:3b, no GPU needed on Mac)
-  - "openai"  → OpenAI API (set OPENAI_API_KEY, uses gpt-4o-mini by default)
+STAGE 6 of PLAN-learn.md. Reference: `git show 4c7f66a:arxiv_rag/generate.py`
 
-The system prompt grounds the model strictly in retrieved context to reduce
-hallucination. Each answer includes paper citations.
+Backends:
+  - "ollama"  -> local model (default llama3.2:3b, no GPU needed on Mac)
+  - "openai"  -> OpenAI API (set OPENAI_API_KEY, gpt-4o-mini by default)
+
+Keep the backend branch at the top of generate() and give both the same
+signature: one prompt, two transports.
 """
 
 from __future__ import annotations
 
 from .config import Config
 
-_SYSTEM_PROMPT = """\
-You are a research assistant specialized in machine learning and AI.
-Answer the user's question using ONLY the paper excerpts provided below.
-For each claim you make, cite the paper title in brackets, e.g. [PercepTax].
-If the excerpts don't contain enough information, say so clearly.
-Do NOT make up results, numbers, or claims not in the excerpts.
-"""
+
+# TODO: write the system prompt. It is the safety mechanism of the whole
+# system, and it needs exactly three things:
+#
+#   1. "Answer using ONLY the excerpts provided below"
+#        -> scopes the model to your retrieved context.
+#   2. "Cite the paper title in brackets, e.g. [PercepTax]"
+#        -> makes claims auditable. Without citations you cannot distinguish a
+#           grounded answer from a hallucination.
+#   3. "If the excerpts don't contain enough information, say so clearly"
+#        -> THE MOST IMPORTANT LINE. Without an explicit escape hatch, models
+#           pattern-match toward answering anyway. With it, they'll decline.
+#
+# You can watch #3 work: asked about cross-property reasoning over a corpus
+# that had no such benchmark, the reference build said it couldn't find one
+# instead of inventing it. That line is the difference between a demo and a tool.
+_SYSTEM_PROMPT = None
 
 
 def _build_context(chunks: list[dict]) -> str:
-    """Format retrieved chunks into a context block for the prompt."""
-    sections = []
-    for i, c in enumerate(chunks, 1):
-        header = f"[{i}] {c['title']} ({c['published']}) — {c['section']}"
-        sections.append(f"{header}\n{c['text']}")
-    return "\n\n---\n\n".join(sections)
+    """Format retrieved chunks into a context block for the prompt.
+
+    TODO: number them [1], [2], ... so citations are checkable against the
+    retrieval output printed above the answer. Include title, published date
+    and section in each header, then the text. Separate blocks with a clear
+    delimiter (e.g. "\\n\\n---\\n\\n").
+    """
+    raise NotImplementedError
 
 
 def generate(query: str, chunks: list[dict], config: Config | None = None,
@@ -42,65 +56,31 @@ def generate(query: str, chunks: list[dict], config: Config | None = None,
 
     Returns:
         Generated answer string.
-    """
-    cfg = config or Config()
-    context = _build_context(chunks)
-    user_message = f"Context:\n{context}\n\nQuestion: {query}"
 
-    if cfg.llm_backend == "openai":
-        return _generate_openai(user_message, cfg)
-    else:
-        return _generate_ollama(user_message, cfg, stream=stream)
+    TODO: build the user message as "Context:\\n{context}\\n\\nQuestion: {query}",
+    then dispatch on cfg.llm_backend.
+
+    CHECKPOINT: ask something your corpus definitely can't answer ("what is the
+    capital of France?"). A correct system REFUSES. If it answers, your system
+    prompt is too weak — go back and strengthen rule #3.
+    """
+    raise NotImplementedError
 
 
 def _generate_ollama(user_message: str, cfg: Config, stream: bool = True) -> str:
-    """Call Ollama local server."""
-    try:
-        import ollama
-    except ImportError:
-        raise RuntimeError("pip install ollama")
+    """Call the local Ollama server.
 
-    messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {"role": "user", "content": user_message},
-    ]
-
-    if stream:
-        full_response = ""
-        for chunk in ollama.chat(
-            model=cfg.ollama_model,
-            messages=messages,
-            stream=True,
-        ):
-            token = chunk["message"]["content"]
-            print(token, end="", flush=True)
-            full_response += token
-        print()  # newline after streaming
-        return full_response
-    else:
-        response = ollama.chat(model=cfg.ollama_model, messages=messages)
-        return response["message"]["content"]
+    TODO: ollama.chat(model=cfg.ollama_model, messages=[system, user], stream=...).
+    When streaming, each chunk is chunk["message"]["content"] — print it with
+    end="", flush=True and accumulate the full string to return.
+    """
+    raise NotImplementedError
 
 
 def _generate_openai(user_message: str, cfg: Config) -> str:
-    """Call OpenAI API (requires OPENAI_API_KEY env var)."""
-    import os
-    try:
-        from openai import OpenAI
-    except ImportError:
-        raise RuntimeError("pip install openai")
+    """Call the OpenAI API (requires OPENAI_API_KEY).
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("Set OPENAI_API_KEY to use the OpenAI backend.")
-
-    client = OpenAI(api_key=api_key)
-    response = client.chat.completions.create(
-        model=cfg.openai_model,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": user_message},
-        ],
-        temperature=0.2,
-    )
-    return response.choices[0].message.content
+    TODO: read the key from env and raise a clear error if missing. Use
+    temperature=0.2 — this is a factual grounding task, not creative writing.
+    """
+    raise NotImplementedError
