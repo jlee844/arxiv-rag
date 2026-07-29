@@ -17,6 +17,21 @@ from functools import lru_cache
 import numpy as np
 
 
+@lru_cache(maximize=1)
+def _best_device() -> str:
+  """Pick fastest available torch backend.
+
+    MPS = Apple's Metal Performance Shaders, i.e. the integrated GPU.
+    Cached because torch import + probe isn't free and the answer never changes.
+    """
+    import torch
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+
 @lru_cache(maxsize=1)
 def _model(model_name: str):
     """Load the SentenceTransformer once and cache it.
@@ -31,25 +46,34 @@ def _model(model_name: str):
 
     TODO: import SentenceTransformer here, return SentenceTransformer(model_name).
     """
-    raise NotImplementedError
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer(model_name, device=device)
 
 
 def embed_texts(texts: list[str], model_name: str = "all-MiniLM-L6-v2",
                 batch_size: int = 64, show_progress: bool = False) -> np.ndarray:
     """Embed a list of strings. Returns (N, D) float32 array, L2-normalized.
+    Args:
+        texts: List of strings to embed.
+        model_name: Sentence-transformers model identifier.
+        batch_size: Encoding batch size (lower = less RAM, slower).
+        show_progress: Show a tqdm progress bar.
+        device: Force a torch device. None = auto-detect (mps/cuda/cpu).
 
-    TODO: call _model(model_name).encode(...) with
-      batch_size=batch_size
-      show_progress_bar=show_progress
-      normalize_embeddings=True   <- see below
-      convert_to_numpy=True
-    then .astype(np.float32).
-
-    WHY normalize_embeddings=True: after L2 normalization, cosine similarity IS
-    the dot product — the division drops out. Chroma's hnsw:space=cosine then
-    works correctly and faster. Nearly free, so always on.
+    Returns:
+        Array of shape (len(texts), embedding_dim), each row unit-length.
+    
+    
     """
-    raise NotImplementedError
+    model = _model(model_name, device or _best_device())
+    embeddings = model.encode(
+        texts,
+        batch_size=batch_size,
+        show_progress_bar=show_progress,
+        normalize_embeddings=True,   # cosine similarity == dot product
+        convert_to_numpy=True,
+    )
+    return embeddings.astype(np.float32)
 
 
 def embed_query(query: str, model_name: str = "all-MiniLM-L6-v2") -> np.ndarray:
@@ -58,4 +82,4 @@ def embed_query(query: str, model_name: str = "all-MiniLM-L6-v2") -> np.ndarray:
     TODO: one line in terms of embed_texts. Mind the shape — callers want (D,),
     not (1, D).
     """
-    raise NotImplementedError
+    return embed_texts([query], model_name=model_name)[0]

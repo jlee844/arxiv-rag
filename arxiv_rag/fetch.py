@@ -29,6 +29,16 @@ class Paper:
       arxiv_id, title, authors (list[str]), abstract,
       categories (list[str]), published (ISO date str), pdf_url, entry_url
     """
+    arxiv_id: str
+    title: str
+    authors: list[str]
+    abstract: str
+    categories: list[str]
+    published: str
+    pdf_url: str
+    entry_url: str
+
+
 
 
 def fetch_papers(query: str, max_results: int = 50) -> list[Paper]:
@@ -37,19 +47,32 @@ def fetch_papers(query: str, max_results: int = 50) -> list[Paper]:
     Args:
         query: Free-text search, e.g. "vision language model evaluation benchmark"
         max_results: Number of results (arXiv ToS caps at 300)
-
-    TODO:
-      1. Build an arxiv.Client. Set delay_seconds=3.0 (ToS) and num_retries=3.
-      2. Build an arxiv.Search with sort_by=arxiv.SortCriterion.Relevance.
-      3. Map each result -> Paper.
-
-    Gotcha: result.entry_id is a full URL. arxiv_id needs .split("/")[-1],
-    or you end up writing PDFs to a filename of "http:".
-
-    Gotcha: result.summary has hard line breaks. Strip them with .replace("\\n", " ").
     """
-    raise NotImplementedError
+    client = arxiv.Client(
+      page_size = min(max_results, 100),
+      delay_seconds = 3.0,
+      num_retries = 3
+    )
 
+    search = arxiv.Search(
+      query = query,
+      sort_by = arxiv.SortCriterion.Relevance,
+      max_results = max_results
+    )
+
+    papers = []
+    for result in client.results(search):
+      papers.append(Paper(
+        arxiv_id = result.entry_id.split("/")[-1],
+        title = result.title,
+        authors = [author.name for author in result.authors],
+        abstract = result.summary.replace("\n", " "),
+        categories = result.categories,
+        published = result.published.strftime("%Y-%m-%d"),
+        pdf_url = result.pdf_url,
+        entry_url = result.entry_id,
+      ))
+    return papers
 
 def download_pdf(paper: Paper, pdf_dir: Path, skip_existing: bool = True) -> Path:
     """Download a paper's PDF to pdf_dir/<arxiv_id>.pdf, returning the path.
@@ -61,7 +84,17 @@ def download_pdf(paper: Paper, pdf_dir: Path, skip_existing: bool = True) -> Pat
          full text, and they ask for it.
       3. requests.get(timeout=30), raise_for_status(), write_bytes().
     """
-    raise NotImplementedError
+    pdf_dir = Path(pdf_dir)
+    dest = pdf_dir / f"{paper.arxiv_id}.pdf"
+
+    if skip_existing and dest.exists():
+        return dest
+
+    time.sleep(1.5)                      # arXiv asks for a gap between downloads
+    resp = requests.get(paper.pdf_url, timeout=30)
+    resp.raise_for_status()
+    dest.write_bytes(resp.content)
+    return dest
 
 
 def download_all(papers: list[Paper], pdf_dir: Path) -> dict[str, Path]:
@@ -70,4 +103,10 @@ def download_all(papers: list[Paper], pdf_dir: Path) -> dict[str, Path]:
     TODO: loop with tqdm. Catch exceptions PER PAPER and continue — one
     malformed PDF must not kill a 50-paper ingest.
     """
-    raise NotImplementedError
+    paths = {}
+    for paper in tqdm(papers, desc="Downloading PDFs"):
+        try:
+            paths[paper.arxiv_id] = download_pdf(paper, pdf_dir)
+        except Exception as e:
+            print(f"  [skip] {paper.arxiv_id}: {e}")
+    return paths
