@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="640" viewBox="0 0 920 640" role="img" aria-label="arxiv-rag demo: query to grounded answer">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1d23"/>
+      <stop offset="100%" stop-color="#12141a"/>
+    </linearGradient>
+    <style><![CDATA[
+      .t { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      .dim { fill: #6b7280; }
+      .cmd { fill: #e5e7eb; }
+      .ok { fill: #86efac; }
+      .meta { fill: #93c5fd; }
+      .ans { fill: #fde68a; }
+      .body { fill: #d1d5db; }
+    ]]></style>
+  </defs>
+  <rect width="920" height="640" rx="12" fill="url(#bg)"/>
+  <circle cx="28" cy="28" r="6" fill="#ef4444"/>
+  <circle cx="48" cy="28" r="6" fill="#eab308"/>
+  <circle cx="68" cy="28" r="6" fill="#22c55e"/>
+  <text x="96" y="33" class="t dim" font-size="13">arxiv-rag - query to answer</text>
+
+  <text x="28" y="72" class="t dim" font-size="13">$</text>
+  <text x="44" y="72" class="t cmd" font-size="13">.venv/bin/python scripts/query.py "POPE object hallucination polling"</text>
+
+  <text x="28" y="108" class="t dim" font-size="12">------------------------------------------------------------</text>
+  <text x="28" y="130" class="t ok" font-size="13">Retrieved 5 chunks:</text>
+
+  <text x="28" y="158" class="t meta" font-size="12">[1] Seeing without Looking... - benchmarks.  RRF 0.03252</text>
+  <text x="40" y="178" class="t body" font-size="11">POPE formulates object hallucination evaluation into a series of...</text>
+
+  <text x="28" y="204" class="t meta" font-size="12">[2] Toward More Reliable AI... - Hallucinations in VLMs  RRF 0.03202</text>
+  <text x="40" y="224" class="t body" font-size="11">Object hallucinations in image captioning; extensively studied...</text>
+
+  <text x="28" y="250" class="t meta" font-size="12">[3] Toward More Reliable AI... - Quantitative Results (POPE table)</text>
+  <text x="28" y="270" class="t meta" font-size="12">[4] GLIMPSE... - Hallucination and Bias Analysis</text>
+  <text x="28" y="290" class="t meta" font-size="12">[5] Toward More Reliable AI... - Experimental Setup</text>
+
+  <text x="28" y="320" class="t dim" font-size="12">------------------------------------------------------------</text>
+  <text x="28" y="344" class="t ans" font-size="13">Answer (ollama / qwen2.5:14b):</text>
+
+  <text x="28" y="372" class="t body" font-size="12">POPE (Polling-based Object Probing Evaluation) is a benchmark for</text>
+  <text x="28" y="392" class="t body" font-size="12">evaluating object existence hallucinations in vision-language models [2].</text>
+  <text x="28" y="412" class="t body" font-size="12">It reveals that even state-of-the-art VLMs exhibit substantial false</text>
+  <text x="28" y="432" class="t body" font-size="12">positive rates [2]. The POPE benchmark measures accuracy, precision,</text>
+  <text x="28" y="452" class="t body" font-size="12">recall, and F1-score across Random, Popular, and Adversarial splits</text>
+  <text x="28" y="472" class="t body" font-size="12">(3,000 questions each) [5]. The Adversarial split targets objects</text>
+  <text x="28" y="492" class="t body" font-size="12">frequently co-occurring but absent in the specific image [5].</text>
+
+  <text x="28" y="528" class="t dim" font-size="12">------------------------------------------------------------</text>
+  <text x="28" y="556" class="t dim" font-size="12">hybrid RRF | excerpt citations [n] | local Qwen 2.5 via Ollama</text>
+  <text x="28" y="580" class="t dim" font-size="11">Source: docs/demo-session.txt (live run)</text>
+</svg>

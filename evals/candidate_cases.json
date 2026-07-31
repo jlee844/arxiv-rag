@@ -1,0 +1,560 @@
+[
+  {
+    "id": "paraphrase-1911.12377",
+    "tag": "paraphrase",
+    "query": "how to improve navigation agents using multimodal attention for low-level tasks",
+    "relevant": [
+      "1911.12377"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-1911.12377",
+    "tag": "rare",
+    "query": "PTA architecture for R2R and R4R benchmarks",
+    "relevant": [
+      "1911.12377"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-1909.10225",
+    "tag": "paraphrase",
+    "query": "report on gender diversity initiatives at computer vision conferences",
+    "relevant": [
+      "1909.10225"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-1909.10225",
+    "tag": "rare",
+    "query": "WiCV 2019 workshop report",
+    "relevant": [
+      "1909.10225"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2307.12114",
+    "tag": "paraphrase",
+    "query": "how do leading instruction-tuned language models perform in clinical and biomedical nlp tasks without task-specific training?",
+    "relevant": [
+      "2307.12114"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2307.12114",
+    "tag": "rare",
+    "query": "evaluation of chatgpt on clinical biomedical nlp tasks",
+    "relevant": [
+      "2307.12114"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2404.07214",
+    "tag": "paraphrase",
+    "query": "review of visual language models capabilities and future research directions",
+    "relevant": [
+      "2404.07214"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2404.07214",
+    "tag": "rare",
+    "query": "benchmark datasets for vision-language models",
+    "relevant": [
+      "2404.07214"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2209.07098",
+    "tag": "paraphrase",
+    "query": "how does multi-modal learning improve medical image and text understanding using masked autoencoders?",
+    "relevant": [
+      "2209.07098"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2209.07098",
+    "tag": "rare",
+    "query": "M^3AE medical vision-and-language pre-training",
+    "relevant": [
+      "2209.07098"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2104.04167",
+    "tag": "paraphrase",
+    "query": "how to improve navigation using object-aware language models in indoor environments",
+    "relevant": [
+      "2104.04167"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2104.04167",
+    "tag": "rare",
+    "query": "ORIST indoor vision-language navigation",
+    "relevant": [
+      "2104.04167"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-0407028",
+    "tag": "paraphrase",
+    "query": "how does improving language modeling affect speech-based question answering systems",
+    "relevant": [
+      "0407028"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-0407028",
+    "tag": "rare",
+    "query": "NTCIR QA test collection performance evaluation",
+    "relevant": [
+      "0407028"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2505.21089",
+    "tag": "paraphrase",
+    "query": "dataset for assessing damage from various disasters using satellite imagery",
+    "relevant": [
+      "2505.21089"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2505.21089",
+    "tag": "rare",
+    "query": "DisasterM3 remote sensing vision-language dataset",
+    "relevant": [
+      "2505.21089"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2408.09720",
+    "tag": "paraphrase",
+    "query": "new large pedestrian attribute recognition dataset with cross-domain images",
+    "relevant": [
+      "2408.09720"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2408.09720",
+    "tag": "rare",
+    "query": "LLM-PAR framework for pedestrian attribute recognition",
+    "relevant": [
+      "2408.09720"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2307.03135",
+    "tag": "paraphrase",
+    "query": "how to improve small vision-language models for better out-of-distribution performance",
+    "relevant": [
+      "2307.03135"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2307.03135",
+    "tag": "rare",
+    "query": "open-vocabulary out-of-distribution generalization in model distillation",
+    "relevant": [
+      "2307.03135"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2410.00982",
+    "tag": "paraphrase",
+    "query": "method for improving vision-language models to better understand and describe critical traffic events",
+    "relevant": [
+      "2410.00982"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2410.00982",
+    "tag": "rare",
+    "query": "ScVLM benchmark for safety-critical event understanding",
+    "relevant": [
+      "2410.00982"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2403.17811",
+    "tag": "paraphrase",
+    "query": "how do different compression techniques affect the fairness towards underrepresented groups in BERT models",
+    "relevant": [
+      "2403.17811"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2403.17811",
+    "tag": "rare",
+    "query": "benchmark for subgroup robustness in compressed language models",
+    "relevant": [
+      "2403.17811"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2502.09927",
+    "tag": "paraphrase",
+    "query": "novel lightweight multimodal system for enterprise visual document analysis",
+    "relevant": [
+      "2502.09927"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2502.09927",
+    "tag": "rare",
+    "query": "Granite Vision safety classification approach",
+    "relevant": [
+      "2502.09927"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2010.01177",
+    "tag": "paraphrase",
+    "query": "method for enhancing neural networks with adaptive frequency filtering",
+    "relevant": [
+      "2010.01177"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2010.01177",
+    "tag": "rare",
+    "query": "Global Adaptive Filtering Layer",
+    "relevant": [
+      "2010.01177"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2310.14025",
+    "tag": "paraphrase",
+    "query": "method for selecting images that match ambiguous words in specific contexts",
+    "relevant": [
+      "2310.14025"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2310.14025",
+    "tag": "rare",
+    "query": "Chain-of-Thought prompting for VWSD",
+    "relevant": [
+      "2310.14025"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2109.01134",
+    "tag": "paraphrase",
+    "query": "method for improving vision language models through context optimization",
+    "relevant": [
+      "2109.01134"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2109.01134",
+    "tag": "rare",
+    "query": "CoOp vision-language model adaptation",
+    "relevant": [
+      "2109.01134"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2309.04041",
+    "tag": "paraphrase",
+    "query": "how do large vision-language models connect language with real-world objects and concepts",
+    "relevant": [
+      "2309.04041"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2309.04041",
+    "tag": "rare",
+    "query": "fine-grained semantic grounding assessment LVLMs",
+    "relevant": [
+      "2309.04041"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2510.22370",
+    "tag": "paraphrase",
+    "query": "novel reinforcement learning approach combining visual language understanding with geometric states for autonomous lane keeping",
+    "relevant": [
+      "2510.22370"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2510.22370",
+    "tag": "rare",
+    "query": "BLIP-FusePPO framework for autonomous vehicle lane keeping",
+    "relevant": [
+      "2510.22370"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2504.06925",
+    "tag": "paraphrase",
+    "query": "how effective are modern vision-language models in identifying food items from images",
+    "relevant": [
+      "2504.06925"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2504.06925",
+    "tag": "rare",
+    "query": "Expert-Weighted Recall for VLMs in Food Recognition",
+    "relevant": [
+      "2504.06925"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2103.04037",
+    "tag": "paraphrase",
+    "query": "reviewing progress and future directions for transformers in language and vision tasks",
+    "relevant": [
+      "2103.04037"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2103.04037",
+    "tag": "rare",
+    "query": "visuolinguistic cross-modal tasks transformer review",
+    "relevant": [
+      "2103.04037"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2412.09082",
+    "tag": "paraphrase",
+    "query": "new approach for long-term navigation planning and evaluation in complex environments",
+    "relevant": [
+      "2412.09082"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2412.09082",
+    "tag": "rare",
+    "query": "LHPR-VLN benchmark vision-language navigation",
+    "relevant": [
+      "2412.09082"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2306.12174",
+    "tag": "paraphrase",
+    "query": "method for improving medical image analysis using multimodal language models",
+    "relevant": [
+      "2306.12174"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2306.12174",
+    "tag": "rare",
+    "query": "ophthalmic multimodal instruction-following dataset",
+    "relevant": [
+      "2306.12174"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2506.18985",
+    "tag": "paraphrase",
+    "query": "method for explaining visual attention in large vision-language models",
+    "relevant": [
+      "2506.18985"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2506.18985",
+    "tag": "rare",
+    "query": "GLIMPSE cross-modal explainability framework",
+    "relevant": [
+      "2506.18985"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2303.10093",
+    "tag": "paraphrase",
+    "query": "how does additional information about objects affect vision-language models for image analysis tasks",
+    "relevant": [
+      "2303.10093"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2303.10093",
+    "tag": "rare",
+    "query": "attribute context in open-vocabulary object detection",
+    "relevant": [
+      "2303.10093"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2603.20985",
+    "tag": "paraphrase",
+    "query": "evaluating medical vision-language models for safety beyond paraphrase consistency",
+    "relevant": [
+      "2603.20985"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2603.20985",
+    "tag": "rare",
+    "query": "per-sample safety taxonomy in medical VLMs",
+    "relevant": [
+      "2603.20985"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2508.05838",
+    "tag": "paraphrase",
+    "query": "how to improve robot object interaction using vision models and reinforcement learning",
+    "relevant": [
+      "2508.05838"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2508.05838",
+    "tag": "rare",
+    "query": "AI2-THOR environment with SAM and PPO",
+    "relevant": [
+      "2508.05838"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2409.11353",
+    "tag": "paraphrase",
+    "query": "methodology for assessing and reducing false information generated by large language models",
+    "relevant": [
+      "2409.11353"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2409.11353",
+    "tag": "rare",
+    "query": "THaMES framework",
+    "relevant": [
+      "2409.11353"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2603.23521",
+    "tag": "paraphrase",
+    "query": "dataset for improving vision language models with indian languages",
+    "relevant": [
+      "2603.23521"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2603.23521",
+    "tag": "rare",
+    "query": "Chitrakshara dataset series",
+    "relevant": [
+      "2603.23521"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2603.15969",
+    "tag": "paraphrase",
+    "query": "system for identifying regional dialects of a multilingual language",
+    "relevant": [
+      "2603.15969"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2603.15969",
+    "tag": "rare",
+    "query": "Romansh Grischun classification",
+    "relevant": [
+      "2603.15969"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2105.14897",
+    "tag": "paraphrase",
+    "query": "how to use natural language descriptions for finding vehicles in traffic management",
+    "relevant": [
+      "2105.14897"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2105.14897",
+    "tag": "rare",
+    "query": "AIC2021 T5 CLV vehicle retrieval",
+    "relevant": [
+      "2105.14897"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "paraphrase-2410.08397",
+    "tag": "paraphrase",
+    "query": "method integrating language model and vision network for medical imaging tasks",
+    "relevant": [
+      "2410.08397"
+    ],
+    "source": "llm-draft-unverified"
+  },
+  {
+    "id": "rare-2410.08397",
+    "tag": "rare",
+    "query": "VoxelPrompt benchmark for neuroimaging tasks",
+    "relevant": [
+      "2410.08397"
+    ],
+    "source": "llm-draft-unverified"
+  }
+]

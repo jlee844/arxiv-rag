@@ -29,3 +29,9 @@ env/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Pytest
+.pytest_cache/
+
+# Local-only build notes (not pushed)
+NOTES-changes.md

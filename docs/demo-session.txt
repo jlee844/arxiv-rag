@@ -1,0 +1,31 @@
+$ .venv/bin/python scripts/query.py "POPE object hallucination polling"
+
+
+────────────────────────────────────────────────────────────
+Retrieved 5 chunks:
+
+[1] Seeing without Looking: Do Vision-Language Benchmarks Really Test Vision? (2026-05-21) — benchmarks.
+    arXiv:2605.22903v1  |  RRF score: 0.03252
+    Recent work has introduced a range of benchmarks for evaluating hallucination and grounding in vision–language models [6, 14, 17, 28]. POPE [17] formulates object hallucination evaluation into a serie...
+
+[2] Toward More Reliable Artificial Intelligence: Reducing Hallucinations in Vision-Language Models (2025-12-08) — Hallucinations in Vision-Language Models
+    arXiv:2512.07564v1  |  RRF score: 0.03202
+    Vision-language hallucinations have been extensively studied across various tasks and model architectures. Early work by Rohrbach et al. [21] identified object hallucinations in image captioning syste...
+
+[3] Toward More Reliable Artificial Intelligence: Reducing Hallucinations in Vision-Language Models (2025-12-08) — Quantitative Results
+    arXiv:2512.07564v1  |  RRF score: 0.01613
+    4.2.1 Object Existence Verification (POPE) Table 1 presents the performance comparison between the baseline Qwen2.5-VL-7B (Greedy Decoding) and our Self-Correcting framework. Table 1: Results on POPE ...
+
+[4] GLIMPSE: Holistic Cross-Modal Explainability for Large Vision-Language Models (2025-06-23) — 5.4. Hallucination and Bias Analysis
+    arXiv:2506.18985v3  |  RRF score: 0.01587
+    We examine how GLIMPSE can help diagnose hallucination and bias in generative LVLM outputs. Understanding why vision–language models make incorrect inferences requires more than measuring output accur...
+
+[5] Toward More Reliable Artificial Intelligence: Reducing Hallucinations in Vision-Language Models (2025-12-08) — Experimental Setup
+    arXiv:2512.07564v1  |  RRF score: 0.01587
+    We evaluate our framework using the Qwen2.5-VL 7B [24] model as the backbone. Qwen2.5VL 7B employs a Vision Transformer with 675M parameters using 2D-RoPE for spatial encoding, connected to a Qwen2.5-...
+
+────────────────────────────────────────────────────────────
+Answer (ollama / qwen2.5:14b):
+
+POPE (Polling-based Object Probing Evaluation) is a benchmark for evaluating object existence hallucinations in vision-language models [2]. It reveals that even state-of-the-art VLMs exhibit substantial false positive rates [2]. The POPE benchmark measures accuracy, precision, recall, and F1-score across Random, Popular, and Adversarial splits (3,000 questions each) [5]. The Adversarial split is particularly critical as it targets objects frequently co-occurring but absent in the specific image [5].
+────────────────────────────────────────────────────────────

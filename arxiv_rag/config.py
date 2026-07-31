@@ -19,25 +19,35 @@ class Config:
     # Embedding model — fast CPU model, multilingual-capable
     # swap to "all-mpnet-base-v2" for better quality at ~2x slower
     embed_model: str = "all-MiniLM-L6-v2"
+    # None = auto-detect (mps on Apple Silicon). Pin to "cpu" for REPRODUCIBLE
+    # measurement: MPS and CPU differ by ~2e-7 per component, which is enough to
+    # flip near-tied HNSW neighbours and move recall by a whole case.
+    embed_device: str | None = None
 
     # Chunking
     chunk_size: int = 512       # tokens (approximate, split by words)
     chunk_overlap: int = 64     # token overlap between consecutive chunks
 
-    # Retrieval
+    # Retrieval (hybrid RRF — no score weights; ranks only)
     top_k: int = 8              # candidates from each retriever before fusion
     final_k: int = 5            # chunks passed to the LLM
-    dense_weight: float = 0.65  # weight for dense score in fusion (rest goes to BM25)
+    exact_search_max: int = 80_000   # above this, fall back to Chroma HNSW.
+                                # Measured crossover: exact matmul is ~0.02ms
+                                # @2.8k and ~1.1ms @100k; HNSW is ~1.1ms flat.
+    rrf_k: int = 60             # RRF damping. Higher = flatter = rewards
+                                # cross-retriever consensus over any single
+                                # retriever's confidence. 60 is the value from
+                                # the original RRF paper; swept in EVAL.md.
 
     # Generation backend: "ollama" | "openai"
-    # Ollama runs locally with no GPU on Apple Silicon (Metal) or CPU
+    # Ollama runs locally with Metal on Apple Silicon
     llm_backend: str = field(
         default_factory=lambda: os.getenv("ARXIV_RAG_BACKEND", "ollama")
     )
 
     # Ollama settings
     ollama_model: str = field(
-        default_factory=lambda: os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+        default_factory=lambda: os.getenv("OLLAMA_MODEL", "qwen2.5:14b")
     )
     ollama_base_url: str = "http://localhost:11434"
 

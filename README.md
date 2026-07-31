@@ -1,79 +1,67 @@
 # arxiv-rag
 
-Local RAG (Retrieval-Augmented Generation) over arXiv ML/AI papers. Runs fully on CPU — no GPU required.
+Local hybrid RAG over arXiv ML/AI papers. Fetch → section-aware chunk → embed
+→ **BM25 + dense (RRF)** → grounded answer via Ollama (Qwen 2.5) or OpenAI.
 
-**Stack:** arXiv API → PyMuPDF → sentence-transformers → ChromaDB + BM25 → Ollama (local LLM)
+Built to be measurable: see [EVAL.md](EVAL.md) for recall/MRR and latency at
+20 and 106 papers.
 
-```
-Query: "what methods reduce hallucination in VLMs?"
+**Stack:** arXiv API → PyMuPDF → sentence-transformers (MPS on Apple Silicon) →
+ChromaDB + BM25 → Ollama / OpenAI
 
-[1] PercepTax (2025-06) — Cross-Property Reasoning
-    Experiments show that GPT-5 achieves only 39.84% on cross-property
-    reasoning compared to 87% on object description...
+![Demo: query → retrieved chunks → grounded answer](docs/demo.png)
 
-[2] VLM Hallucination Survey (2024-11) — Methods
-    Contrastive decoding, RLHF-based calibration, and retrieval-augmented
-    generation have emerged as the dominant approaches...
-
-Answer [llama3.2:3b]:
-Based on the papers, three main approaches address VLM hallucination: [PercepTax]
-identifies that the bottleneck is cross-property reasoning integration, not
-individual property recognition. [VLM Hallucination Survey] covers contrastive
-decoding and RLHF calibration as the most effective interventions...
-```
+<sub>Live session: [`docs/demo-session.txt`](docs/demo-session.txt) · vector: [`docs/demo.svg`](docs/demo.svg)</sub>
 
 ## Quickstart
 
-### 1. Install dependencies
+### 1. Environment
 
 ```bash
 cd arxiv-rag
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Install Ollama (local LLM, no GPU needed on Apple Silicon)
+### 2. Ollama (default backend)
 
 ```bash
-# macOS
-brew install ollama
-
-# Then pull a small model (~2GB)
-ollama pull llama3.2:3b
-
-# Start the server (keep this running in a separate terminal)
-ollama serve
+brew install ollama          # macOS
+ollama pull qwen2.5:14b      # ~9 GB; fits comfortably on 36 GB unified memory
+ollama serve                 # keep running in another terminal
 ```
 
-> **No GPU?** `llama3.2:3b` runs at ~8 tok/s on Intel Mac CPU, ~30 tok/s on Apple Silicon via Metal.  
-> **OpenAI fallback:** `export OPENAI_API_KEY=sk-... && export ARXIV_RAG_BACKEND=openai`
+Override model anytime: `export OLLAMA_MODEL=qwen2.5:14b`
 
-### 3. Ingest papers
+**OpenAI fallback:** `export OPENAI_API_KEY=...` and `export ARXIV_RAG_BACKEND=openai`
+
+### 3. Ingest
 
 ```bash
-# Ingest 30 papers on VLM evaluation
-python scripts/ingest.py "vision language model evaluation benchmark" --n 30
+# Search ingest
+.venv/bin/python scripts/ingest.py "vision language model evaluation" --n 30
 
-# Ingest papers on RL for LLM agents
-python scripts/ingest.py "reinforcement learning LLM agent uncertainty" --n 20
+# Specific IDs (good smoke test)
+.venv/bin/python scripts/ingest.py --ids 2605.22903,2306.09265,2406.12384
 
-# Add specific papers by arXiv ID
-python scripts/ingest.py --ids 2406.01234,2501.16411
-
-# Check what's indexed
-python scripts/ingest.py --list
+.venv/bin/python scripts/ingest.py --list
 ```
 
 ### 4. Query
 
 ```bash
-# Interactive mode
-python scripts/query.py
+.venv/bin/python scripts/query.py "POPE object hallucination polling"
+.venv/bin/python scripts/query.py "what is the capital of France?"   # should refuse
+.venv/bin/python scripts/query.py "POPE object hallucination" --chunks-only
+```
 
-# One-shot
-python scripts/query.py "how does GRPO compare to PPO for LLM fine-tuning?"
+### 5. Eval / latency
 
-# See retrieved chunks without generating
-python scripts/query.py "LoRA fine-tuning surgical robotics" --chunks-only
+```bash
+.venv/bin/python scripts/eval_recall.py
+.venv/bin/python scripts/bench_latency.py --rounds 15
+pytest tests/ -v
 ```
 
 ## Architecture
@@ -82,62 +70,60 @@ python scripts/query.py "LoRA fine-tuning surgical robotics" --chunks-only
 arXiv API
    │
    ▼
-fetch.py          Download paper metadata + PDFs (respects rate limits)
+fetch.py          metadata + PDFs (rate-limited)
    │
    ▼
-parse.py          Section-aware chunking
-                  • Abstract → dedicated chunk
-                  • Body → split at section headers, then 512-word windows
-                    with 64-word overlap
+parse.py          section-aware chunks + Unicode ligature normalize (NFKD)
    │
    ▼
-embed.py          all-MiniLM-L6-v2 (22 MB, CPU-fast, L2-normalized)
+embed.py          all-MiniLM-L6-v2 (MPS when available)
    │
-   ├─── index.py  ChromaDB (dense, cosine) + BM25Okapi (sparse, keyword)
-   │              Both persist to data/ — survives restarts
-   │
-   ▼
-retrieve.py       Hybrid: RRF fusion of dense + BM25 results
-                  • BM25 wins on exact terms: "GRPO", "LoRA", "HDBSCAN"
-                  • Dense wins on semantic similarity
-                  • RRF is robust to score scale differences
+   ├─── index.py  ChromaDB (dense) + BM25Okapi (sparse), both on disk
    │
    ▼
-generate.py       System prompt grounds LLM to retrieved context only
-                  Ollama (local) or OpenAI (OPENAI_API_KEY)
+retrieve.py       Reciprocal Rank Fusion + dense_rank / bm25_rank provenance
+   │
+   ▼
+generate.py       excerpt-numbered context; bib [n] stripped from bodies;
+                  system prompt refuses when unsupported
 ```
 
 ## Configuration
 
-All tuneable in `arxiv_rag/config.py` or via env vars:
+`arxiv_rag/config.py` or env:
 
 | Setting | Default | Notes |
 |---|---|---|
-| `embed_model` | `all-MiniLM-L6-v2` | Swap to `all-mpnet-base-v2` for ~5% better recall |
-| `chunk_size` | 512 words | ~384 tokens |
-| `chunk_overlap` | 64 words | |
-| `top_k` | 8 | Candidates per retriever before fusion |
-| `final_k` | 5 | Chunks passed to LLM |
-| `ARXIV_RAG_BACKEND` | `ollama` | `ollama` or `openai` |
-| `OLLAMA_MODEL` | `llama3.2:3b` | Any model in `ollama list` |
+| `embed_model` | `all-MiniLM-L6-v2` | Swap `all-mpnet-base-v2` for quality |
+| `chunk_size` / `chunk_overlap` | 512 / 64 words | |
+| `top_k` / `final_k` | 8 / 5 | Per-retriever candidates → LLM context |
+| `ARXIV_RAG_BACKEND` | `ollama` | or `openai` |
+| `OLLAMA_MODEL` | `qwen2.5:14b` | any `ollama list` tag |
 
-## Tests
-
-```bash
-pip install pytest
-pytest tests/ -v
-```
+Fusion is **RRF ranks only** — there is no dense/BM25 score weight.
 
 ## Design decisions
 
-**Why RRF over weighted score normalization?**  
-BM25 scores and cosine similarity live on different scales. Normalizing them requires per-query calibration. RRF rank fusion is scale-invariant and consistently performs well without tuning.
+**Why RRF?** BM25 and cosine live on incompatible scales; weighting them is a
+calibration trap. RRF fuses ranks. Consensus max ≈ 0.0328; single-retriever
+floor ≈ 0.0164.
 
-**Why section-level chunking first?**  
-ML papers have strong section structure (Abstract, Related Work, Method, Experiments). Splitting at section boundaries keeps semantically coherent text together. Word-count windowing only activates for long sections.
+**Why hybrid?** BM25 wins on rare tokens (`POPE`, `VARCO-VISION`); dense wins
+on paraphrase. They disagree often enough that fusion is justified (see EVAL).
 
-**Why `all-MiniLM-L6-v2` not a larger model?**  
-On CPU without quantization, MiniLM-L6 encodes ~1000 chunks/min. `all-mpnet-base-v2` (5× slower) gives ~5% better retrieval recall — not worth the indexing time for interactive use.
+**Why strip paper `[17]` cites before generation?** Same syntax as excerpt
+`[1]`. Models copy bibliography numbers; stripping bodies leaves only excerpt
+headers to cite.
 
-**Why Ollama over llama.cpp directly?**  
-Ollama handles model download, Metal acceleration on Apple Silicon, and a persistent server with an OpenAI-compatible API — less setup for the same result.
+**Why section chunking?** ML papers have strong section structure; windowing
+only kicks in inside long sections.
+
+## Known limits
+
+Documented with numbers in [EVAL.md](EVAL.md): one hard paraphrase miss, OOD
+queries can still get high RRF (no naive score-gate), PDF tables become token
+soup, eval labels lag corpus growth.
+
+## License
+
+[MIT](LICENSE)

@@ -59,7 +59,7 @@ def _run_query(query: str, index: PaperIndex, cfg: Config, chunks_only: bool) ->
         generate(query, chunks, cfg, stream=(cfg.llm_backend == "ollama"))
     except RuntimeError as e:
         click.echo(f"Generation error: {e}", err=True)
-        click.echo("Tip: install Ollama (https://ollama.ai) and run: ollama pull llama3.2:3b")
+        click.echo("Tip: install Ollama (https://ollama.ai) and run: ollama pull qwen2.5:14b")
     click.echo("─" * 60)
 
 

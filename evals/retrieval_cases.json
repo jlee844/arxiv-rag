@@ -1,0 +1,110 @@
+[
+    {
+      "id": "easy-title",
+      "tag": "easy",
+      "query": "CausalVLBench visual causal reasoning",
+      "relevant": ["2506.11034"]
+    },
+    {
+      "id": "paraphrase-hallucination",
+      "tag": "paraphrase",
+      "query": "datasets that check whether VLMs invent objects that are not in the image",
+      "relevant": ["2605.22903"]
+    },
+    {
+      "id": "paraphrase-language-prior",
+      "tag": "paraphrase",
+      "query": "do strong benchmark scores mean the model actually used the pixels?",
+      "relevant": ["2605.22903"]
+    },
+    {
+      "id": "paraphrase-remote-sensing",
+      "tag": "paraphrase",
+      "query": "captioning and visual question answering for satellite imagery",
+      "relevant": ["2406.12384"]
+    },
+    {
+      "id": "paraphrase-medical-lay",
+      "tag": "paraphrase",
+      "query": "gap between expert radiology wording and patient-friendly captions from VLMs",
+      "relevant": ["2606.21194"]
+    },
+    {
+      "id": "acronym-pope",
+      "tag": "acronym",
+      "query": "POPE object hallucination polling",
+      "relevant": ["2605.22903"]
+    },
+    {
+      "id": "acronym-vlue",
+      "tag": "acronym",
+      "query": "VLUE multitask VLM evaluation suite",
+      "relevant": ["2205.15237"]
+    },
+    {
+      "id": "acronym-elevater",
+      "tag": "acronym",
+      "query": "ELEVATER toolkit zero-shot classification",
+      "relevant": ["2204.08790"]
+    },
+    {
+      "id": "ambiguous-survey",
+      "tag": "ambiguous",
+      "query": "overview of vision language pretraining methods and trends",
+      "relevant": ["2202.09061", "2210.09263"]
+    },
+    {
+      "id": "ambiguous-detection",
+      "tag": "ambiguous",
+      "query": "using multimodal VLMs for detecting objects in images survey",
+      "relevant": ["2508.19294", "2504.09480"]
+    },
+    {
+      "id": "distractor-benchmark",
+      "tag": "distractor",
+      "query": "One Billion Word Benchmark for language modeling progress",
+      "relevant": ["1312.3005"]
+    },
+    {
+      "id": "rare-token-korean",
+      "tag": "rare",
+      "query": "VARCO-VISION Hangul multimodal",
+      "relevant": ["2411.19103"]
+    },
+    {
+      "id": "rare-token-blip-trace",
+      "tag": "rare",
+      "query": "causal tracing tool for BLIP activations",
+      "relevant": ["2308.14179"]
+    },
+    {
+      "id": "path-planning-eval",
+      "tag": "paraphrase",
+      "query": "can a VLM judge whether a robot path is valid",
+      "relevant": ["2411.18711"]
+    },
+    {
+      "id": "german-factual",
+      "tag": "paraphrase",
+      "query": "factuality of vision-language models on non-English German knowledge",
+      "relevant": ["2504.11108"]
+    },
+    {
+      "id": "neg-capital",
+      "tag": "negative",
+      "query": "what is the capital of France?",
+      "relevant": []
+    },
+    {
+      "id": "neg-stock-price",
+      "tag": "negative",
+      "query": "what was Apple stock closing price yesterday?",
+      "relevant": []
+    },
+    {
+      "id": "neg-cooking",
+      "tag": "negative",
+      "query": "best temperature for baking sourdough bread",
+      "relevant": []
+    }
+  ]

@@ -57,5 +57,13 @@ def test_config_defaults():
     cfg = Config()
     assert cfg.chunk_size > 0
     assert cfg.chunk_overlap < cfg.chunk_size
-    assert 0 < cfg.dense_weight < 1
     assert cfg.final_k <= cfg.top_k
+    assert not hasattr(cfg, "dense_weight")  # removed: RRF has no weight term
+
+
+def test_strip_bib_cites():
+    from arxiv_rag.generate import _strip_bib_cites
+    text = "POPE [17] and refs [6, 14, 17, 28] evaluate hallucination."
+    assert _strip_bib_cites(text) == (
+        "POPE  and refs  evaluate hallucination."
+    )
