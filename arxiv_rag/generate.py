@@ -9,6 +9,7 @@ is the one people leave out.
 from __future__ import annotations
 
 from .config import Config
+from .retrieve import max_dense_score
 
 import re
 
@@ -21,6 +22,8 @@ def _strip_bib_cites(text: str) -> str:
     return _BIB_CITE.sub("", text)
 
 
+
+REFUSAL = "The provided excerpts do not contain enough information to answer this."
 
 _SYSTEM_PROMPT = """\
 You are a research assistant specialized in machine learning and AI.
@@ -69,6 +72,22 @@ def generate(query: str, chunks: list[dict], config: Config | None = None,
     if not chunks:
         return ("No indexed content matched that query. Try ingesting more "
                 "papers, or rephrasing.")
+
+    # Relevance gate. Prompt instructions alone DO NOT stop a capable model
+    # answering off-topic questions from its own weights — measured: hardening
+    # the system prompt and delimiting the context changed nothing. Worse, a
+    # retrieved excerpt can itself carry instructions (an indexed paper about
+    # hallucination evaluation contains the literal line "What is the capital
+    # of France? ... can be answered based on general knowledge"), which the
+    # model then follows over the system prompt: indirect prompt injection.
+    # The only reliable fix is to not call the model at all when nothing
+    # relevant was retrieved.
+    best = max_dense_score(chunks)
+    if best < getattr(cfg, "min_relevance", 0.37):
+        msg = REFUSAL
+        if stream:
+            print(msg)
+        return msg
     context = _build_context(chunks)
     user_message = (
         f"Context:\n{context}\n\n"

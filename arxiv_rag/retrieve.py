@@ -103,13 +103,22 @@ def retrieve(query: str, index: PaperIndex, config: Config | None = None) -> lis
 
     ranked = sorted(rrf_scores.items(), key=lambda kv: kv[1], reverse=True)
 
+    # When reranking, keep a wider candidate list for the cross-encoder to
+    # rescore; otherwise it can only reorder what fusion already chose.
+    keep = getattr(cfg, "rerank_top_n", 20) if getattr(cfg, "rerank", False) else cfg.final_k
+
     results = []
-    for cid, score in ranked[: cfg.final_k]:
+    for cid, score in ranked[:keep]:
         entry = dict(chunk_map[cid])
         entry["rrf_score"] = round(score, 5)
         entry["dense_rank"] = dense_rank.get(cid)
         entry["bm25_rank"] = bm25_rank.get(cid)
         results.append(entry)
+
+    if getattr(cfg, "rerank", False):
+        from .rerank import rerank as _rerank
+        results = _rerank(query, results, top_n=cfg.rerank_top_n,
+                          final_k=cfg.final_k, model_name=cfg.rerank_model)
 
     return results
 
@@ -121,3 +130,20 @@ RETRIEVERS = {
     "dense": retrieve_dense,
     "bm25": retrieve_bm25,
 }
+
+
+def max_dense_score(hits: list[dict]) -> float:
+    """Best dense cosine similarity among hits, or 0.0 if dense found none.
+
+    Only entries carrying a dense_rank have a cosine `score`; BM25-only entries
+    carry an unbounded BM25 score, and mixing the two would let a BM25 score of
+    ~20 sail past any cosine threshold.
+
+    Approximation worth naming: this reads the post-fusion top-`final_k`, not
+    the full dense candidate set. Dense rank 1 could in principle be pushed out
+    of the final list by 5 consensus chunks — but a query with 5 chunks both
+    retrievers agree on is unambiguously on-topic, so the gate would pass anyway.
+    """
+    dense = [h["score"] for h in hits
+             if h.get("dense_rank") and isinstance(h.get("score"), (int, float))]
+    return max(dense) if dense else 0.0
