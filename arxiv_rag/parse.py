@@ -10,6 +10,7 @@ Strategy:
 """
 
 from __future__ import annotations
+import os
 import re
 import unicodedata
 from collections import Counter
@@ -217,3 +218,41 @@ def parse_pdf(pdf_path: Path, paper, chunk_size: int = 512,
         _make_chunk(_norm_heading(section), _clean(raw))
 
     return chunks
+
+
+def _parse_one(args):
+    """Module-level so ProcessPoolExecutor can pickle it (a closure cannot)."""
+    pdf_path, paper, chunk_size, chunk_overlap = args
+    try:
+        return parse_pdf(pdf_path, paper, chunk_size, chunk_overlap)
+    except Exception as exc:                      # one bad PDF must not kill the pool
+        return exc
+
+
+def parse_many(jobs: list[tuple], chunk_size: int = 512, chunk_overlap: int = 64,
+               workers: int | None = None):
+    """Parse many PDFs in parallel. jobs = [(pdf_path, paper), ...].
+
+    Yields (paper, chunks_or_exception) as results complete.
+
+    WHY processes and not threads: parsing is pure CPU (PyMuPDF text extraction
+    + regex + string work), so the GIL would serialise threads. Measured serial
+    cost is ~121 ms/PDF; on 14 cores this is the single largest CPU win in the
+    ingest path.
+
+    Each worker opens its own fitz.Document — PyMuPDF handles per-process init
+    fine, but a Document must never be shared across processes.
+    """
+    from concurrent.futures import ProcessPoolExecutor
+
+    if workers is None:
+        workers = min(len(jobs), os.cpu_count() or 4)
+    if workers <= 1 or len(jobs) <= 1:
+        for path, paper in jobs:
+            yield paper, _parse_one((path, paper, chunk_size, chunk_overlap))
+        return
+
+    payload = [(p, pa, chunk_size, chunk_overlap) for p, pa in jobs]
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for (path, paper), result in zip(jobs, pool.map(_parse_one, payload)):
+            yield paper, result

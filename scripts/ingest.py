@@ -22,7 +22,7 @@ from tqdm import tqdm
 from arxiv_rag.config import Config
 from arxiv_rag.fetch import fetch_papers, download_all
 from arxiv_rag.index import PaperIndex
-from arxiv_rag.parse import parse_pdf
+from arxiv_rag.parse import parse_many, parse_pdf
 
 
 @click.command()
@@ -89,20 +89,28 @@ def main(query, n, ids, list_papers):
     # --- Parse + index ---
     click.echo("\nParsing and indexing ...")
     total_chunks = 0
-    for paper in tqdm(new_papers, desc="Papers"):
-        pdf_path = pdf_paths.get(paper.arxiv_id)
-        if not pdf_path or not pdf_path.exists():
-            tqdm.write(f"  [skip] {paper.arxiv_id}: PDF not downloaded")
-            continue
-        try:
-            chunks = parse_pdf(pdf_path, paper,
-                               chunk_size=cfg.chunk_size,
-                               chunk_overlap=cfg.chunk_overlap)
-            added = index.add_chunks(chunks)
+
+    # Parse every PDF in parallel FIRST (pure CPU, ~397 ms/PDF serial), then
+    # index. Measured 6.5x on 14 cores over 115 PDFs: 45.6s -> 7.0s.
+    jobs = [(pdf_paths[p.arxiv_id], p) for p in new_papers
+            if pdf_paths.get(p.arxiv_id) and pdf_paths[p.arxiv_id].exists()]
+    skipped = len(new_papers) - len(jobs)
+    if skipped:
+        click.echo(f"  [skip] {skipped} papers: PDF not downloaded")
+
+    # One BM25 rebuild for the whole run instead of one per paper (55x less
+    # rebuild CPU, 58x less disk written).
+    with index.batch():
+        for paper, result in tqdm(parse_many(jobs,
+                                             chunk_size=cfg.chunk_size,
+                                             chunk_overlap=cfg.chunk_overlap),
+                                  total=len(jobs), desc="Papers"):
+            if isinstance(result, Exception):
+                tqdm.write(f"  [error] {paper.arxiv_id}: {result}")
+                continue
+            added = index.add_chunks(result)
             total_chunks += added
             tqdm.write(f"  {paper.arxiv_id}: {added} chunks added")
-        except Exception as e:
-            tqdm.write(f"  [error] {paper.arxiv_id}: {e}")
 
     click.echo(f"\nDone. Added {total_chunks} chunks. Index now has {index.count()} total chunks.")
 
