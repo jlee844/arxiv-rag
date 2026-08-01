@@ -1,17 +1,37 @@
 # arxiv-rag
 
-Local hybrid RAG over arXiv ML/AI papers. Fetch → section-aware chunk → embed
-→ **BM25 + dense (RRF)** → grounded answer via Ollama (Qwen 2.5) or OpenAI.
+Local hybrid RAG over arXiv ML/AI papers. Fetch → section-aware chunk → embed →
+**BM25 + dense (RRF)** → relevance gate → grounded answer via Ollama (Qwen 2.5)
+or OpenAI. Ships with a streaming HTTP API and a zero-build web UI.
 
-Built to be measurable: see [EVAL.md](EVAL.md) for recall/MRR and latency at
-20 and 106 papers.
-
-**Stack:** arXiv API → PyMuPDF → sentence-transformers (MPS on Apple Silicon) →
-ChromaDB + BM25 → Ollama / OpenAI
+Built to be measurable. Every claim below is reproducible with a command in this
+repo; the numbers live in [EVAL.md](EVAL.md).
 
 ![Demo: query → retrieved chunks → grounded answer](docs/demo.png)
 
 <sub>Live session: [`docs/demo-session.txt`](docs/demo-session.txt) · vector: [`docs/demo.svg`](docs/demo.svg)</sub>
+
+## Does hybrid retrieval actually help?
+
+Ablated over 76 scored queries, 109 papers / 2960 chunks:
+
+| retriever | recall@5 | MRR | paraphrase (37) | rare token (32) |
+|---|---|---|---|---|
+| dense only | 93.42% | 0.877 | 89% | 97% |
+| BM25 only | 90.79% | 0.846 | 81% | 100% |
+| **hybrid RRF** | **96.05%** | **0.937** | **92%** | **100%** |
+
+```bash
+.venv/bin/python scripts/eval_recall.py --ablate
+```
+
+Dense wins paraphrase, BM25 wins rare technical tokens, fusion takes both. That
+split is the entire argument for hybrid, and it only became visible after the
+eval set grew from 15 to 76 cases — at n=15 all three tied at 93.33%, because
+one case was worth 6.7pp and the effect being measured is 2.6pp.
+
+**Stack:** arXiv API → PyMuPDF → sentence-transformers (MPS on Apple Silicon) →
+ChromaDB + BM25 → FastAPI (SSE) → Ollama / OpenAI
 
 ## Quickstart
 
@@ -28,38 +48,61 @@ pip install -r requirements.txt
 
 ```bash
 brew install ollama          # macOS
-ollama pull qwen2.5:14b      # ~9 GB; fits comfortably on 36 GB unified memory
+ollama pull qwen2.5:14b      # ~9 GB
 ollama serve                 # keep running in another terminal
 ```
-
-Override model anytime: `export OLLAMA_MODEL=qwen2.5:14b`
 
 **OpenAI fallback:** `export OPENAI_API_KEY=...` and `export ARXIV_RAG_BACKEND=openai`
 
 ### 3. Ingest
 
 ```bash
-# Search ingest
 .venv/bin/python scripts/ingest.py "vision language model evaluation" --n 30
-
-# Specific IDs (good smoke test)
 .venv/bin/python scripts/ingest.py --ids 2605.22903,2306.09265,2406.12384
-
 .venv/bin/python scripts/ingest.py --list
 ```
 
-### 4. Query
+Parses in parallel across all cores and rebuilds BM25 once per run — 115 PDFs
+re-index in 12.7 s.
+
+### 4. Query — CLI
 
 ```bash
 .venv/bin/python scripts/query.py "POPE object hallucination polling"
-.venv/bin/python scripts/query.py "what is the capital of France?"   # should refuse
-.venv/bin/python scripts/query.py "POPE object hallucination" --chunks-only
+.venv/bin/python scripts/query.py "what is the capital of France?"   # refuses
 ```
 
-### 5. Eval / latency
+### 5. Serve — API + web UI
 
 ```bash
-.venv/bin/python scripts/eval_recall.py
+.venv/bin/uvicorn arxiv_rag.api:app --reload --port 8001
+```
+
+Open <http://localhost:8001>. Interactive API docs at `/docs`.
+
+| endpoint | purpose |
+|---|---|
+| `GET /api/health` | index size, models, whether exact search is active |
+| `POST /api/search` | retrieval only — fast, and the best debugging surface |
+| `POST /api/chat` | SSE stream: `sources` → `token`… → `done` |
+
+```bash
+curl -s localhost:8001/api/health | python3 -m json.tool
+curl -s -X POST localhost:8001/api/search -H 'Content-Type: application/json' \
+  -d '{"query":"CLIP","mode":"hybrid","k":3}'
+curl -N -X POST localhost:8001/api/chat -H 'Content-Type: application/json' \
+  -d '{"query":"how is POPE used to evaluate hallucination?"}'
+```
+
+`mode` accepts `hybrid` | `dense` | `bm25`, so the ablation is switchable live
+in the browser. Every result carries `dense_rank` / `bm25_rank` / `rrf_score`,
+which makes fusion visible rather than asserted.
+
+### 6. Eval / latency / tests
+
+```bash
+.venv/bin/python scripts/eval_recall.py --ablate    # retriever comparison
+.venv/bin/python scripts/eval_recall.py --gate      # abstain threshold sweep
 .venv/bin/python scripts/bench_latency.py --rounds 15
 pytest tests/ -v
 ```
@@ -70,22 +113,26 @@ pytest tests/ -v
 arXiv API
    │
    ▼
-fetch.py          metadata + PDFs (rate-limited)
+fetch.py          metadata + PDFs (ToS rate-limited, cached on disk)
    │
    ▼
-parse.py          section-aware chunks + Unicode ligature normalize (NFKD)
+parse.py          font-metric section detection, NFKD ligature fix,
+                  parallel across cores
    │
    ▼
 embed.py          all-MiniLM-L6-v2 (MPS when available)
    │
-   ├─── index.py  ChromaDB (dense) + BM25Okapi (sparse), both on disk
-   │
+   ├─── index.py  ChromaDB + exact matmul (dense) · BM25Okapi (sparse)
+   │              batched rebuild; both persisted to disk
    ▼
 retrieve.py       Reciprocal Rank Fusion + dense_rank / bm25_rank provenance
    │
+   ▼   relevance gate — below Config.min_relevance the LLM is never invoked
+   │
+generate.py       excerpt-numbered context; refuses when unsupported
+   │
    ▼
-generate.py       excerpt-numbered context; bib [n] stripped from bodies;
-                  system prompt refuses when unsupported
+api.py            FastAPI + SSE streaming, citation check, static web UI
 ```
 
 ## Configuration
@@ -94,35 +141,60 @@ generate.py       excerpt-numbered context; bib [n] stripped from bodies;
 
 | Setting | Default | Notes |
 |---|---|---|
-| `embed_model` | `all-MiniLM-L6-v2` | Swap `all-mpnet-base-v2` for quality |
+| `embed_model` | `all-MiniLM-L6-v2` | swap `all-mpnet-base-v2` for quality |
+| `embed_device` | auto | pin `cpu` for reproducible measurement |
 | `chunk_size` / `chunk_overlap` | 512 / 64 words | |
-| `top_k` / `final_k` | 8 / 5 | Per-retriever candidates → LLM context |
+| `top_k` / `final_k` | 8 / 5 | per-retriever candidates → LLM context |
+| `rrf_k` | 60 | RRF damping; higher rewards consensus |
+| `min_relevance` | 0.37 | abstain gate on dense cosine |
+| `exact_search_max` | 80 000 | above this, fall back to HNSW |
+| `rerank` | `False` | cross-encoder; **measured worse**, see below |
 | `ARXIV_RAG_BACKEND` | `ollama` | or `openai` |
 | `OLLAMA_MODEL` | `qwen2.5:14b` | any `ollama list` tag |
 
-Fusion is **RRF ranks only** — there is no dense/BM25 score weight.
-
 ## Design decisions
 
-**Why RRF?** BM25 and cosine live on incompatible scales; weighting them is a
-calibration trap. RRF fuses ranks. Consensus max ≈ 0.0328; single-retriever
-floor ≈ 0.0164.
+**Why RRF, not weighted scores?** BM25 is unbounded and corpus-relative; cosine
+is 0–1. Weighting them is a calibration trap that has to be retuned whenever the
+corpus changes. RRF fuses ranks, so it needs no calibration.
 
-**Why hybrid?** BM25 wins on rare tokens (`POPE`, `VARCO-VISION`); dense wins
-on paraphrase. They disagree often enough that fusion is justified (see EVAL).
+**Why exact search instead of the vector DB's ANN index?** ChromaDB's HNSW
+returned **six different result sets across six identical processes**, silently
+swinging eval recall@5 by 13pp. At this corpus size a matmul over a 4.4 MB
+matrix is both deterministic and *faster* (0.04 ms vs 1.1 ms). HNSW is kept as a
+fallback above the measured ~80k-vector crossover.
+
+**Why a relevance gate rather than a better prompt?** An indexed paper about
+hallucination evaluation contains prompt templates in its appendix — including
+the literal line *"Example of a valid question: 'What is the capital of France?'
+… can be answered based on general knowledge."* The model obeyed the retrieved
+text over its system prompt: indirect prompt injection, arriving organically.
+Hardening the prompt changed the output **byte-for-byte not at all**. Gating on
+retrieval similarity works because an injected chunk can only influence a model
+that gets invoked.
+
+**Why is reranking off?** It was implemented, measured, and rejected: MRR
+0.900 → 0.867, abstain AUC 0.970 → 0.927, +82 ms/query, and the known failure
+case unchanged. Kept behind a flag so the negative result stays reproducible
+(`--rerank`).
+
+**Why font-based section detection?** A regex matched table rows and figure
+captions as headings, which split real sections and silently discarded content.
+Typography separates structure from subject matter; character patterns don't.
 
 **Why strip paper `[17]` cites before generation?** Same syntax as excerpt
-`[1]`. Models copy bibliography numbers; stripping bodies leaves only excerpt
-headers to cite.
-
-**Why section chunking?** ML papers have strong section structure; windowing
-only kicks in inside long sections.
+`[1]`. Models copy bibliography numbers; stripping them from bodies leaves only
+excerpt headers to cite.
 
 ## Known limits
 
-Documented with numbers in [EVAL.md](EVAL.md): one hard paraphrase miss, OOD
-queries can still get high RRF (no naive score-gate), PDF tables become token
-soup, eval labels lag corpus growth.
+Documented with numbers in [EVAL.md](EVAL.md):
+
+- 61 of 76 positive eval cases are auto-triaged, not hand-verified.
+- 18% of adversarial negatives still leak past the relevance gate — positives
+  and negatives overlap, so no threshold separates them cleanly.
+- One hard paraphrase case is missed by every retriever tested.
+- PDF tables flatten into token soup and can surface as top hits.
 
 ## License
 
