@@ -49,7 +49,7 @@ the `Also relevant` line — an incomplete label reads as a false miss.
 
 ---
 
-### [KEEP] rare-2404.07214
+### [DROP] rare-2404.07214
 
 - **verdict:** `MISS`  ·  **source rank:** `None`  ·  **tag:** `rare`
 - **query:** benchmark datasets for vision-language models
@@ -72,7 +72,7 @@ the `Also relevant` line — an incomplete label reads as a false miss.
   2. `2402.15010` How Important Is Tokenization in French Medical Masked Language Models 
   3. `2306.12174` OphGLM: Training an Ophthalmology Large Language-and-Vision Assistant  
   4. `2307.12114` A Zero-shot and Few-shot Study of Instruction-Finetuned Large Language **<-- labeled**
-- **Also relevant (add ids, space-separated):** 
+- **Also relevant (add ids, space-separated):** 2403.13369 2306.12174
 
 ---
 

@@ -25,7 +25,7 @@ import click
 
 from arxiv_rag.config import Config
 from arxiv_rag.index import PaperIndex
-from arxiv_rag.retrieve import RETRIEVERS, retrieve
+from arxiv_rag.retrieve import RETRIEVERS, max_dense_score, retrieve
 
 CASES = Path(__file__).parent.parent / "evals" / "retrieval_cases.json"
 
@@ -169,11 +169,17 @@ def print_ablation(runs: list[dict], k: int) -> None:
                    "differs by ~2e-7/component, enough to flip near-tied HNSW "
                    "neighbours and move recall a full case. Use 'mps' to "
                    "measure the production path instead.")
+@click.option("--rerank", "use_rerank", is_flag=True,
+              help="Enable cross-encoder rerank (measured worse; see NOTES §11)")
+@click.option("--gate", is_flag=True,
+              help="Validate the abstain threshold: sweep Config.min_relevance "
+                   "and report false-abstain vs catch rate")
 @click.option("--repeat", default=1, type=int,
               help="Run N times and report min/max — determinism guard.")
-def main(k, cases, tag, mode, ablate, rrf_k_sweep, device, repeat) -> None:
+def main(k, cases, tag, mode, ablate, rrf_k_sweep, device, use_rerank, gate, repeat) -> None:
     cfg = Config()
     cfg.embed_device = None if device == "auto" else device
+    cfg.rerank = use_rerank
     if k is not None:
         cfg.final_k = k
     index = PaperIndex(cfg)
@@ -186,6 +192,38 @@ def main(k, cases, tag, mode, ablate, rrf_k_sweep, device, repeat) -> None:
         data = [c for c in data if c.get("tag") == tag]
 
     click.echo(f"corpus: {index.count()} chunks / {len(index.indexed_papers())} papers")
+
+    if gate:
+        # Score every case ONCE, then sweep thresholds over the cached numbers.
+        pos, neg = [], []
+        for c in data:
+            best = max_dense_score(retrieve(c["query"], index, cfg))
+            (neg if not c.get("relevant") else pos).append((c["id"], c["query"], best))
+
+        pos.sort(key=lambda r: r[2]); neg.sort(key=lambda r: -r[2])
+        click.echo(f"\npositives n={len(pos)}  negatives n={len(neg)}")
+        click.echo(f"lowest-scoring positives (false-abstain risk):")
+        for i, q, s_ in pos[:4]:
+            click.echo(f"   {s_:.4f}  {q[:58]}")
+        click.echo(f"highest-scoring negatives (leak risk):")
+        for i, q, s_ in neg[:4]:
+            click.echo(f"   {s_:.4f}  {q[:58]}")
+
+        lo = max(n[2] for n in neg) if neg else 0.0
+        hi = min(p_[2] for p_ in pos) if pos else 1.0
+        click.echo(f"\nmax negative = {lo:.4f}   min positive = {hi:.4f}   "
+                   f"separation = {hi - lo:+.4f}"
+                   + ("" if hi > lo else "   <-- OVERLAP: no clean threshold"))
+
+        click.echo(f"\n| thresh | false-abstain | negatives caught |")
+        click.echo(f"|--------|---------------|------------------|")
+        for t in [0.25, 0.30, 0.35, 0.37, 0.40, 0.45, 0.50]:
+            fa = sum(1 for _, _, s_ in pos if s_ < t)
+            ct = sum(1 for _, _, s_ in neg if s_ < t)
+            mark = "  <- current" if abs(t - cfg.min_relevance) < 1e-9 else ""
+            click.echo(f"| {t:.2f}   | {fa:2}/{len(pos):2} ({fa/max(len(pos),1):5.1%}) "
+                       f"| {ct:2}/{len(neg):2} ({ct/max(len(neg),1):5.1%}) |{mark}")
+        return
 
     if rrf_k_sweep:
         runs = []
