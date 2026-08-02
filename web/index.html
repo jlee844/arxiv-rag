@@ -1,29 +1,65 @@
 <!doctype html>
 <meta charset="utf-8"><title>arxiv-rag</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
- body{font:15px/1.55 -apple-system,system-ui,sans-serif;max-width:820px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
- h1{font-size:1.2rem;margin:0 0 .2rem} .sub{color:#666;font-size:.85rem;margin-bottom:1.2rem}
- form{display:flex;gap:.5rem} input{flex:1;padding:.6rem;border:1px solid #ccc;border-radius:6px;font-size:15px}
- select,button{padding:.6rem;border:1px solid #ccc;border-radius:6px;background:#fff;font-size:14px;cursor:pointer}
- button{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
- #warn{display:none;background:#fff4f4;border:1px solid #e5b3b3;color:#8a1f1f;padding:.6rem .8rem;border-radius:6px;margin:1rem 0;font-size:.88rem}
- #answer{white-space:pre-wrap;margin:1.2rem 0;min-height:1em}
- .src{border-left:3px solid #ddd;padding:.4rem 0 .4rem .7rem;margin:.6rem 0;font-size:.85rem;color:#444}
- .src b{color:#1a1a1a} .rank{font-family:ui-monospace,monospace;font-size:.75rem;color:#777}
- .meta{color:#888;font-size:.8rem}
+ /* Theme-aware. The first version set only `color` with no background, so in
+    dark mode near-black text sat on the browser's dark default: ~1.03:1
+    contrast, effectively invisible. color-scheme also lets form controls
+    render natively in both themes. */
+ :root{
+   color-scheme: light dark;
+   --bg:#fff; --fg:#1a1a1a; --muted:#5c5c5c; --dim:#6b6b6b;
+   --line:#ccc; --rule:#ddd; --field:#fff;
+   --btn-bg:#1a1a1a; --btn-fg:#fff;
+   --warn-bg:#fff4f4; --warn-line:#e5b3b3; --warn-fg:#8a1f1f;
+ }
+ @media (prefers-color-scheme: dark){
+   :root{
+     --bg:#16181c; --fg:#e9eaec; --muted:#a8adb4; --dim:#949aa1;
+     --line:#3c424a; --rule:#2c3138; --field:#1e2127;
+     --btn-bg:#e9eaec; --btn-fg:#16181c;
+     --warn-bg:#2b1719; --warn-line:#6d2e2e; --warn-fg:#ff9d9d;
+   }
+ }
+ body{font:15px/1.55 -apple-system,system-ui,sans-serif;max-width:820px;
+      margin:2rem auto;padding:0 1rem;color:var(--fg);background:var(--bg)}
+ h1{font-size:1.5rem;margin:0 0 .25rem;letter-spacing:-.01em} .sub{color:var(--muted);font-size:.8rem;margin-bottom:1.2rem}
+ form{display:flex;gap:.5rem;flex-wrap:wrap}
+ input{flex:1 1 12rem;min-width:0;padding:.6rem;border:1px solid var(--line);
+       border-radius:6px;font-size:15px;background:var(--field);color:var(--fg)}
+ select,button{padding:.6rem;border:1px solid var(--line);border-radius:6px;
+               background:var(--field);color:var(--fg);font-size:15px;cursor:pointer}
+ button{background:var(--btn-bg);color:var(--btn-fg);border-color:var(--btn-bg)}
+ :focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+ #warn{display:none;background:var(--warn-bg);border:1px solid var(--warn-line);
+       color:var(--warn-fg);padding:.6rem .8rem;border-radius:6px;margin:1rem 0;font-size:.88rem}
+ #answer{white-space:pre-wrap;overflow-wrap:anywhere;margin:1.2rem 0;min-height:1em}
+ .src{border-left:1px solid var(--rule);padding:.4rem 0 .4rem .7rem;margin:.6rem 0;
+      font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+ .src b{color:var(--fg)} .rank{font-family:ui-monospace,monospace;font-size:.8rem;color:var(--dim)}
+ .meta{color:var(--dim);font-size:.8rem}
 </style>
 <h1>arxiv-rag</h1>
 <div class="sub" id="health">loading…</div>
 <form id="f">
   <input id="q" placeholder="Ask about the indexed papers…" autocomplete="off" required>
-  <select id="mode"><option>hybrid</option><option>dense</option><option>bm25</option></select>
+  <select id="mode" title="retrieval mode">
+    <option>hybrid</option><option>dense</option><option>bm25</option>
+    <option>expand</option><option>hyde</option>
+  </select>
   <button>Ask</button>
 </form>
 <div id="warn"></div>
+<div id="cited" class="meta"></div>
 <div id="answer"></div>
 <div id="sources"></div>
 <script>
 const $ = s => document.querySelector(s);
+// Titles and chunk text are corpus-derived. This project already found one
+// injection vector in indexed papers; not escaping them here would be a
+// second one.
+const esc = t => String(t).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 fetch('/api/health').then(r=>r.json()).then(h=>{
   $('#health').textContent =
@@ -33,7 +69,8 @@ fetch('/api/health').then(r=>r.json()).then(h=>{
 
 $('#f').onsubmit = async e => {
   e.preventDefault();
-  $('#answer').textContent = ''; $('#sources').innerHTML = ''; $('#warn').style.display='none';
+  $('#answer').textContent = ''; $('#sources').innerHTML = '';
+  $('#warn').style.display='none'; $('#cited').textContent='';
 
   // EventSource is GET-only, so we parse the SSE stream from fetch() by hand.
   const res = await fetch('/api/chat', {
@@ -55,11 +92,21 @@ $('#f').onsubmit = async e => {
       if (ev === 'sources') render(d);
       else if (ev === 'token') $('#answer').textContent += d.t;
       else if (ev === 'error') $('#answer').textContent += `\n[error] ${d.detail}`;
-      else if (ev === 'done' && d.grounded === false) {
-        $('#warn').textContent =
-          '⚠ This answer cites no retrieved excerpt — it likely came from the ' +
-          'model\'s own knowledge, not your papers. Treat it as ungrounded.';
-        $('#warn').style.display = 'block';
+      else if (ev === 'done') {
+        if (d.abstained) {
+          // Not a failure: the relevance gate refused before calling the LLM.
+          $('#warn').textContent =
+            `No excerpt was relevant enough to answer (top similarity ` +
+            `${d.top_similarity}). Refused before calling the model.`;
+          $('#warn').style.display = 'block';
+        } else if (d.cited && d.cited.length) {
+          // Citations are shown as neutral provenance, NOT as a warning.
+          // Measured: qwen2.5:14b emits [n] markers in only 25% of answers that
+          // ARE grounded, and a stronger prompt did not move that. A red banner
+          // on a 25%-precision signal fires on 3 of 4 good answers and teaches
+          // users to ignore it. See NOTES-changes.md §16.
+          $('#cited').textContent = 'cites excerpt ' + d.cited.join(', ');
+        }
       }
     }
   }
@@ -73,8 +120,8 @@ function render(d){
                   r.bm25_rank  ? `bm25#${r.bm25_rank}`  : null]
                  .filter(Boolean).join(' + ') || '—';
     el.insertAdjacentHTML('beforeend', `<div class="src">
-      <b>[${i+1}] ${r.title}</b> <span class="rank">${prov}${r.rrf_score?` · rrf ${r.rrf_score}`:''}</span><br>
-      <span class="meta">${r.arxiv_id} · ${r.section}</span><br>${r.text.slice(0,240)}…</div>`);
+      <b>[${i+1}] ${esc(r.title)}</b> <span class="rank">${prov}${r.rrf_score?` · rrf ${r.rrf_score}`:''}</span><br>
+      <span class="meta">${esc(r.arxiv_id)} · ${esc(r.section)}</span><br>${esc(r.text.slice(0,240))}…</div>`);
   }
 }
 </script>

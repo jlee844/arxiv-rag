@@ -72,7 +72,7 @@ app = FastAPI(title="arxiv-rag", version="1.0", lifespan=lifespan)
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
     k: int | None = Field(None, ge=1, le=20)
-    mode: Literal["hybrid", "dense", "bm25"] = "hybrid"
+    mode: Literal["hybrid", "dense", "bm25", "expand", "hyde"] = "hybrid"
 
 
 class Source(BaseModel):
@@ -149,7 +149,7 @@ def search(req: SearchRequest) -> SearchResponse:
 class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
     k: int | None = Field(None, ge=1, le=20)
-    mode: Literal["hybrid", "dense", "bm25"] = "hybrid"
+    mode: Literal["hybrid", "dense", "bm25", "expand", "hyde"] = "hybrid"
 
 
 def _sse(event: str, data: dict) -> str:

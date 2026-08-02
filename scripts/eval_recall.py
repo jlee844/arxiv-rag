@@ -158,8 +158,8 @@ def print_ablation(runs: list[dict], k: int) -> None:
 @click.option("--cases", default=str(CASES), type=click.Path(exists=True))
 @click.option("--tag", default=None, help="Filter to one tag")
 @click.option("--mode", default="hybrid",
-              type=click.Choice(["hybrid", "dense", "bm25"]),
-              help="Which retriever to score")
+              type=click.Choice(["hybrid", "dense", "bm25", "expand", "hyde"]),
+              help="Which retriever to score (expand/hyde add an LLM call per query)")
 @click.option("--ablate", is_flag=True,
               help="Score dense / bm25 / hybrid and print a comparison table")
 @click.option("--rrf-k", "rrf_k_sweep", default=None,

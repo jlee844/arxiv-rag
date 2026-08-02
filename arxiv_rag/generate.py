@@ -9,7 +9,7 @@ is the one people leave out.
 from __future__ import annotations
 
 from .config import Config
-from .retrieve import max_dense_score
+from .retrieve import max_dense_score, relevance_score
 
 import re
 

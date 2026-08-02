@@ -16,8 +16,10 @@ class Config:
     chroma_dir: Path = ROOT / "data" / "chroma_db"
     bm25_dir: Path = ROOT / "data" / "bm25"
 
-    # Embedding model — fast CPU model, multilingual-capable
-    # swap to "all-mpnet-base-v2" for better quality at ~2x slower
+    # Embedding model. all-mpnet-base-v2 was TESTED and is WORSE here:
+    # dense-only recall 93.42% -> 90.79%, MRR 0.878 -> 0.824, 3.5x slower per
+    # query and 37x slower to build the index. It gains only on abstention
+    # (AUC 0.975 -> 0.984). See NOTES-changes.md §14.
     embed_model: str = "all-MiniLM-L6-v2"
     # None = auto-detect (mps on Apple Silicon). Pin to "cpu" for REPRODUCIBLE
     # measurement: MPS and CPU differ by ~2e-7 per component, which is enough to
@@ -34,13 +36,23 @@ class Config:
     exact_search_max: int = 80_000   # above this, fall back to Chroma HNSW.
                                 # Measured crossover: exact matmul is ~0.02ms
                                 # @2.8k and ~1.1ms @100k; HNSW is ~1.1ms flat.
-    # Abstain gate. If the best DENSE cosine similarity is below this, no
-    # excerpt is topically close and we refuse instead of generating.
-    # Measured separation on this corpus: off-topic max 0.336, on-topic min
-    # 0.403 (n=14). 0.37 sits in that gap. RRF scores CANNOT be used here —
-    # they fuse ranks and discard magnitude, which is exactly the signal a
-    # relevance gate needs (see EVAL.md "Out-of-distribution queries").
-    min_relevance: float = 0.37
+    # Abstain gate on best DENSE cosine. Below this the LLM is never invoked.
+    #
+    # Measured at n=76 positives / 22 negatives: distributions OVERLAP
+    # (max negative 0.6231 > min positive 0.3572), so no value separates them.
+    #   0.35 -> 0/76 false-abstain, 68% of negatives caught   <- chosen
+    #   0.37 -> 1/76 false-abstain, 73%
+    #   0.40 -> 1/76 false-abstain, 82%
+    #
+    # Chose zero false-abstain: the lowest-scoring positives are ALL short
+    # rare-token queries ("THaMES framework", "AI2-THOR environment with SAM
+    # and PPO") where dense is weak and BM25 carries retrieval. Refusing a user
+    # who typed a real paper name is worse than leaking one off-topic question,
+    # which the citation check partly catches anyway.
+    #
+    # RRF scores cannot be used here: they fuse ranks and discard magnitude,
+    # which is precisely the signal a gate needs. See NOTES-changes.md §10/§15.
+    min_relevance: float = 0.35
 
     # Cross-encoder reranking. DEFAULT OFF — measured WORSE than plain hybrid
     # on this corpus (MRR 0.867 vs 0.900, abstain-AUC 0.927 vs 0.970, +82ms).
@@ -49,6 +61,10 @@ class Config:
     rerank: bool = False
     rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     rerank_top_n: int = 20
+
+    # Query expansion. DEFAULT OFF — adds a full LLM call (~2-7 s) in front of
+    # ~8 ms retrieval. See NOTES-changes.md §15 before enabling.
+    query_expansion: str | None = None      # None | "multi" | "hyde"
 
     rrf_k: int = 60             # RRF damping. Higher = flatter = rewards
                                 # cross-retriever consensus over any single

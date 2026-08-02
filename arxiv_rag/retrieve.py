@@ -75,6 +75,12 @@ def retrieve(query: str, index: PaperIndex, config: Config | None = None) -> lis
         it) so you can see WHICH retriever found each result.
     """
     cfg = config or Config()
+
+    mode = getattr(cfg, "query_expansion", None)
+    if mode:
+        return retrieve_expanded(query, index, cfg, mode=mode,
+                                 n=1 if mode == "hyde" else 3)
+
     rrf_k = getattr(cfg, "rrf_k", _RRF_K)
 
     dense_results = index.dense_search(
@@ -115,11 +121,83 @@ def retrieve(query: str, index: PaperIndex, config: Config | None = None) -> lis
         entry["bm25_rank"] = bm25_rank.get(cid)
         results.append(entry)
 
+    # Gate signal, stamped so generate()/api.py can read it without an index.
+    top_dense = dense_results[0]["score"] if dense_results else 0.0
+    for entry in results:
+        entry["relevance"] = float(top_dense)
+
     if getattr(cfg, "rerank", False):
         from .rerank import rerank as _rerank
         results = _rerank(query, results, top_n=cfg.rerank_top_n,
                           final_k=cfg.final_k, model_name=cfg.rerank_model)
 
+    return results
+
+
+def retrieve_expanded(query: str, index: PaperIndex, config: Config | None = None,
+                      mode: str = "multi", n: int = 3) -> list[dict]:
+    """Retrieve over several query phrasings and fuse across all of them.
+
+    RRF extends to this for free: instead of fusing 2 ranked lists (dense, bm25)
+    we fuse 2*V lists for V query variants. A chunk that several variants agree
+    on accumulates several contributions, which is exactly the consensus
+    behaviour RRF already provides between retrievers.
+
+    IMPORTANT — the abstain gate must still be judged on the ORIGINAL query.
+    HyDE passages are answer-shaped, so they sit much closer to chunk embeddings
+    than a question does; letting them set `score` would inflate similarity for
+    every query including off-topic ones and silently break the relevance gate.
+    So dense hits keep the ORIGINAL query's cosine in `score`, and variant
+    similarities are used only for ranking.
+    """
+    from .expand import expand_query
+
+    cfg = config or Config()
+    rrf_k = getattr(cfg, "rrf_k", _RRF_K)
+    variants = expand_query(query, cfg, mode=mode, n=n)
+
+    rrf_scores: dict[str, float] = {}
+    chunk_map: dict[str, dict] = {}
+    dense_rank: dict[str, int] = {}
+    bm25_rank: dict[str, int] = {}
+    origin: dict[str, set] = {}
+
+    for vi, variant in enumerate(variants):
+        d = index.dense_search(
+            embed_query(variant, cfg.embed_model,
+                        device=getattr(cfg, "embed_device", None)).tolist(),
+            k=cfg.top_k,
+        )
+        b = index.bm25_search(variant, k=cfg.top_k)
+        for lst, ranks in ((d, dense_rank), (b, bm25_rank)):
+            for rank, result in enumerate(lst):
+                cid = result["chunk_id"]
+                rrf_scores[cid] = rrf_scores.get(cid, 0.0) + 1.0 / (rrf_k + rank + 1)
+                origin.setdefault(cid, set()).add(vi)
+                # Only the original query (vi == 0) may define the stored dict,
+                # so `score` stays comparable with the un-expanded path.
+                if vi == 0:
+                    chunk_map[cid] = result
+                    ranks.setdefault(cid, rank + 1)
+                else:
+                    chunk_map.setdefault(cid, {**result, "score": None})
+
+    ranked = sorted(rrf_scores.items(), key=lambda kv: kv[1], reverse=True)
+    results = []
+    for cid, score in ranked[: cfg.final_k]:
+        entry = dict(chunk_map[cid])
+        entry["rrf_score"] = round(score, 5)
+        entry["dense_rank"] = dense_rank.get(cid)
+        entry["bm25_rank"] = bm25_rank.get(cid)
+        entry["n_variants"] = len(origin.get(cid, ()))
+        results.append(entry)
+
+    # ORIGINAL-query relevance, not the expanded list's. Reading it off the
+    # result list drops abstain AUC 0.975 -> 0.826, because RRF across variants
+    # frequently evicts the chunk holding the best original-query cosine.
+    rel = relevance_score(query, index, cfg)
+    for entry in results:
+        entry["relevance"] = rel
     return results
 
 
@@ -129,7 +207,29 @@ RETRIEVERS = {
     "hybrid": retrieve,
     "dense": retrieve_dense,
     "bm25": retrieve_bm25,
+    "expand": lambda q, i, c=None: retrieve_expanded(q, i, c, mode="multi"),
+    "hyde": lambda q, i, c=None: retrieve_expanded(q, i, c, mode="hyde", n=1),
 }
+
+
+def relevance_score(query: str, index: PaperIndex,
+                    config: Config | None = None) -> float:
+    """Abstain signal for `query`: best dense cosine over the WHOLE index.
+
+    Computed from the original query directly rather than read off a result
+    list, because the result list is not a stable sample of it. Under query
+    expansion the returned top-k is chosen by RRF across all variants, so the
+    chunk carrying the best original-query cosine is frequently NOT in it —
+    which silently degraded the gate (abstain AUC 0.975 -> 0.828) until this
+    was separated out. See NOTES-changes.md §15.
+    """
+    cfg = config or Config()
+    hits = index.dense_search(
+        embed_query(query, cfg.embed_model,
+                    device=getattr(cfg, "embed_device", None)).tolist(),
+        k=1,
+    )
+    return float(hits[0]["score"]) if hits else 0.0
 
 
 def max_dense_score(hits: list[dict]) -> float:
@@ -144,6 +244,13 @@ def max_dense_score(hits: list[dict]) -> float:
     of the final list by 5 consensus chunks — but a query with 5 chunks both
     retrievers agree on is unambiguously on-topic, so the gate would pass anyway.
     """
+    # Prefer the explicitly stamped signal when present — under query expansion
+    # the result list is not a valid sample of original-query similarity.
+    stamped = [h["relevance"] for h in hits if isinstance(h.get("relevance"), float)]
+    if stamped:
+        return max(stamped)
     dense = [h["score"] for h in hits
              if h.get("dense_rank") and isinstance(h.get("score"), (int, float))]
+    # Entries contributed only by expansion variants carry score=None by design
+    # (see retrieve_expanded) and are correctly excluded by the isinstance check.
     return max(dense) if dense else 0.0

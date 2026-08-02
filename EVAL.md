@@ -65,40 +65,94 @@ Threshold sweep over 76 positives / 22 negatives:
 
 | threshold | false-abstain | negatives caught |
 |---|---|---|
-| 0.35 | 0% | 68% |
-| **0.37 (shipped)** | **0%** | **73%** |
-| 0.40 | 0% | 82% |
-| 0.50 | 13% | 95% |
+| **0.35 (shipped)** | **0/76 (0%)** | **68.2%** |
+| 0.37 | 1/76 (1.3%) | 72.7% |
+| 0.40 | 1/76 (1.3%) | 81.8% |
+| 0.50 | 7/76 (9.2%) | 95.5% |
 
-**Positives and negatives overlap** (max negative 0.6231 > min positive 0.4408),
-so no threshold separates them cleanly. 82% at 0% false-abstain is the ceiling.
-The residual leaks are off-topic questions in on-topic vocabulary:
+**Positives and negatives overlap** (max negative 0.6231 > min positive 0.3572),
+so no threshold separates them cleanly.
+
+Residual leaks are off-topic questions in on-topic vocabulary:
 
 ```
 0.6231  what learning rate should I use with the Adam optimizer
 0.4598  how do I fix a CUDA out of memory error during training
 ```
 
-An earlier measurement claimed clean separation (+0.0669). It was wrong — those
-negatives were too easy. See `NOTES-changes.md` §10.
+The lowest-scoring *positives* are all short rare-token queries:
 
-## Cross-encoder reranking — tested and rejected
+```
+0.3572  THaMES framework
+0.4129  AI2-THOR environment with SAM and PPO
+0.4408  causal tracing tool for BLIP activations
+```
 
-`cross-encoder/ms-marco-MiniLM-L-6-v2`, top-20 → 5:
+**The gate reads dense cosine only, so it inherits dense's blind spot** — it is
+weakest exactly where BM25 carries retrieval. Chose 0/76 false-abstain over 82%
+catch: refusing a user who typed a real paper name looks broken.
 
-| metric | hybrid | + rerank |
-|---|---|---|
-| recall@5 | 93.33% | 93.33% |
-| MRR | **0.900** | 0.867 |
-| abstain AUC | **0.970** | 0.927 |
-| latency | ~8 ms | +82 ms |
+Two earlier published versions of this table were wrong: one claimed clean
+separation (+0.0669) from too-easy negatives, and one was measured at n=15
+positives and never re-run after the eval set grew. See `NOTES-changes.md`
+§10/§15.
 
-Worse on every axis. Chunk-length truncation (200 / 80 words) did not rescue it.
-Kept behind `Config.rerank = False` so the negative result stays reproducible.
+## Standard improvements tested and rejected
 
-**Notable:** the reranker scored the prompt-injection chunk **highest of all 22
-negatives** (+5.88) — correctly, since that chunk genuinely discusses the query.
-A better relevance model is a better injection amplifier.
+| technique | verdict |
+|---|---|
+| cross-encoder reranking (`ms-marco-MiniLM-L-6-v2`, top-20→5) | MRR 0.900 → 0.867, abstain AUC 0.970 → 0.927, +82 ms; chunk truncation to 200/80 words did not rescue it. Kept behind `Config.rerank=False` so it reproduces via `--rerank`. **It scored the prompt-injection chunk highest of all 22 negatives** — a better relevance model is a better injection amplifier. |
+| prompt hardening vs injection | byte-identical output; zero effect |
+| larger embedder (`all-mpnet-base-v2`) | dense recall 93.42% → 90.79%, MRR 0.878 → 0.824, 3.5× slower/query, 37× slower to index |
+| larger `top_k` (12/16/20/30) | recall moves ±1 case (noise); MRR declines monotonically |
+| HyDE (hypothetical document embeddings) | recall 96.05% → 94.74%, 61× latency; invented specifics pull retrieval toward non-existent papers |
+| **hybrid RRF over single retriever** | **kept** — +2.6pp recall, +0.06 MRR |
+| **multi-query expansion** | **kept, opt-in** — recall 96.05% → **98.68%**, fixes all known misses; costs 23× latency and −0.031 MRR |
+
+## Query expansion
+
+| | recall@5 | MRR | abstain AUC | latency |
+|---|---|---|---|---|
+| hybrid (baseline) | 96.05% | **0.936** | 0.975 | **56 ms** |
+| **+ multi-query** | **98.68%** | 0.905 | 0.975 | 1284 ms |
+| + HyDE | 94.74% | 0.910 | 0.819 | 3442 ms |
+
+Multi-query rewriting fixes `paraphrase-hallucination` — the case that survived
+reranking, every `top_k`, and a larger embedder. The mechanism:
+
+```
+original : datasets that check whether VLMs invent objects that are not in the image
+rewrite  : evaluating visual language models for object hallucination in images
+```
+
+The query avoids the field's term of art, so BM25 had zero lexical overlap and
+contributed nothing. The rewrite supplies "hallucination" and BM25 finds it
+immediately.
+
+**Off by default** (`Config.query_expansion = None`): 23× retrieval latency is
+defensible on `/api/chat`, where generation already dominates, but not on
+`/api/search`, which exists to be fast.
+
+The narrow claim: on a single-domain corpus where nearly every chunk is
+topically adjacent to every query, hybrid RRF over a small fast embedder is
+already a strong baseline and the usual upgrades buy nothing measurable.
+
+### The one persistent miss, root-caused
+
+`paraphrase-hallucination` is missed by every configuration above. It is **not**
+a semantic failure — the target chunk ranks 11 of 2960 in the full dense
+ordering (cosine 0.4929, top 0.4%). It loses because RRF at K=60 is deliberately
+flat:
+
+```
+target (dense#11, dense-only)     rrf = 0.01408
+any consensus hit (both, rank 1)  rrf = 0.03279    2.3x
+```
+
+That flatness is what makes consensus outweigh single-retriever confidence — and
+the same property means a deep single-retriever hit can never climb. Lowering K
+would widen the gap, not close it. Fixing this needs query expansion or a
+domain-tuned embedder; neither is tested.
 
 ## Security: indirect prompt injection
 

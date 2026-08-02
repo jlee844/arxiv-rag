@@ -1,0 +1,41 @@
+# Two containers on one host. Compose is the right tool for that; Kubernetes
+# is not — see PLAN-v3.md "Explicit non-goals".
+#
+#   docker compose up --build
+#   open http://localhost:8001
+#
+# First run needs a model:  docker compose exec ollama ollama pull qwen2.5:14b
+
+services:
+  api:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      # Reaches the sibling container by service name, not localhost.
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b}
+      ARXIV_RAG_BACKEND: ${ARXIV_RAG_BACKEND:-ollama}
+    volumes:
+      # The index lives on the host, not in the image. Bind-mounted so an
+      # ingest run on the host is immediately visible to the container.
+      - ./data:/app/data
+    depends_on:
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      # Exposed on 11435 to avoid colliding with a host-native `ollama serve`
+      # already holding 11434.
+      - "11435:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  # Named volume, not a bind mount: model weights are large, opaque, and
+  # regenerable — nothing here belongs in the project directory.
+  ollama-models:

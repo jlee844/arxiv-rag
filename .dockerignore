@@ -1,0 +1,26 @@
+# Build context hygiene. Everything here would otherwise be uploaded to the
+# daemon on every build — .venv alone is 1.3 GB and data/ is ~110 MB.
+.venv/
+venv/
+env/
+data/
+*.pdf
+
+.git/
+.gitignore
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Local-only docs (see .gitignore)
+NOTES-changes.md
+RESUME.md
+PLAN-*.md
+evals/REVIEW.md
+evals/candidate_cases.json
+
+docs/
+.DS_Store
+.vscode/
+.idea/

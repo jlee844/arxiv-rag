@@ -12,13 +12,15 @@ larger finding than the ablation itself; see `NOTES-changes.md` §8–9.
 
 | | |
 |---|---|
-| corpus | 106 papers / 2834 chunks |
+| corpus | 109 papers / 2960 chunks |
 | retrieval | hybrid RRF; dense = exact matmul, deterministic |
-| ablation | dense .867 MRR · BM25 .772 · **hybrid .900** — all tie 93.33% recall@5 |
-| eval set | **18 cases live**, 62 candidates staged in `evals/REVIEW.md` |
+| ablation | dense 93.42% · BM25 90.79% · **hybrid 96.05%** recall@5 (MRR .877/.846/**.937**) |
+| eval set | **98 cases** — 76 positive (61 auto-triaged) + 22 negative |
+| safety | cosine relevance gate + citation check; injection mitigated, 18% negatives still leak |
 | latency | retrieve 7.7 ms p50 · generation seconds (qwen2.5:14b) |
-| API | `arxiv_rag/api.py` skeleton boots; no routes yet |
-| ingest | ~190 s cold for 115 papers, **~90% of it ToS-mandated sleep** |
+| API | **shipped** — SSE streaming, `/api/{health,search,chat}`, web UI on :8001 |
+| ingest | cold ~190 s (~90% ToS sleep) · **warm re-index 12.7 s** (was 71.2 s) |
+| rejected | cross-encoder rerank · prompt hardening · mpnet · larger top_k |
 
 ---
 
