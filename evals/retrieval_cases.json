@@ -822,5 +822,180 @@
       "2410.08397"
     ],
     "source": "llm-draft-auto-triaged"
+  },
+  {
+    "id": "ambiguous-medical-vlp",
+    "tag": "ambiguous",
+    "query": "pre-training vision and language models on medical images and reports",
+    "relevant": [
+      "2209.07098",
+      "2209.07118"
+    ]
+  },
+  {
+    "id": "ambiguous-lvlm-bench",
+    "tag": "ambiguous",
+    "query": "benchmark suites for evaluating large vision language models",
+    "relevant": [
+      "2205.15237",
+      "2306.09265",
+      "2204.08790"
+    ]
+  },
+  {
+    "id": "ambiguous-bias",
+    "tag": "ambiguous",
+    "query": "fairness and social bias in pretrained multimodal models",
+    "relevant": [
+      "2104.08666",
+      "2403.17811",
+      "2511.18123"
+    ]
+  },
+  {
+    "id": "acronym-lvlm-ehub",
+    "tag": "acronym",
+    "query": "LVLM-eHub comprehensive evaluation hub",
+    "relevant": [
+      "2306.09265"
+    ]
+  },
+  {
+    "id": "acronym-clip-td",
+    "tag": "acronym",
+    "query": "CLIP-TD targeted distillation for VL tasks",
+    "relevant": [
+      "2201.05729"
+    ]
+  },
+  {
+    "id": "acronym-pptc-r",
+    "tag": "acronym",
+    "query": "PPTC-R robustness benchmark PowerPoint task completion",
+    "relevant": [
+      "2403.03788"
+    ]
+  },
+  {
+    "id": "acronym-minigpt4",
+    "tag": "acronym",
+    "query": "MiniGPT-4 aligning a frozen visual encoder with an LLM",
+    "relevant": [
+      "2304.10592"
+    ]
+  },
+  {
+    "id": "distractor-remote-physio",
+    "tag": "distractor",
+    "query": "remote measurement of heart rate from facial video",
+    "relevant": [
+      "2407.08507"
+    ]
+  },
+  {
+    "id": "distractor-vocab-transfer",
+    "tag": "distractor",
+    "query": "transferring vocabulary to shrink a language model",
+    "relevant": [
+      "2402.09977"
+    ]
+  },
+  {
+    "id": "distractor-french-tokenize",
+    "tag": "distractor",
+    "query": "how tokenization choices affect French clinical masked models",
+    "relevant": [
+      "2402.15010"
+    ]
+  },
+  {
+    "id": "distractor-explainable",
+    "tag": "distractor",
+    "query": "do explainability methods actually open the black box in vision",
+    "relevant": [
+      "2112.09898"
+    ]
+  },
+  {
+    "id": "easy-stellar",
+    "tag": "easy",
+    "query": "Stellar Imager ultraviolet interferometer vision mission",
+    "relevant": [
+      "0606411"
+    ]
+  },
+  {
+    "id": "easy-insects",
+    "tag": "easy",
+    "query": "insect behaviour monitoring for precision agriculture",
+    "relevant": [
+      "2205.04675"
+    ]
+  },
+  {
+    "id": "capability-physical-props",
+    "tag": "capability",
+    "query": "benchmark testing whether models understand physical properties of objects like mass and friction",
+    "relevant": [
+      "2501.16411"
+    ]
+  },
+  {
+    "id": "capability-intuitive-physics",
+    "tag": "capability",
+    "query": "can models acquire intuitive physics by interacting with an environment",
+    "relevant": [
+      "2602.06033"
+    ]
+  },
+  {
+    "id": "capability-see-not-perceive",
+    "tag": "capability",
+    "query": "benchmark where models see the image but fail at basic perception a human finds trivial",
+    "relevant": [
+      "2404.12390"
+    ]
+  },
+  {
+    "id": "capability-affordance",
+    "tag": "capability",
+    "query": "grounding which region of an object a person could act on to use it",
+    "relevant": [
+      "2504.15650"
+    ]
+  },
+  {
+    "id": "capability-perception-cognition",
+    "tag": "capability",
+    "query": "evaluation covering both perception and cognition abilities across many subtasks",
+    "relevant": [
+      "2306.13394"
+    ]
+  },
+  {
+    "id": "capability-face-id",
+    "tag": "capability",
+    "query": "how accurately do multimodal models identify specific individual faces",
+    "relevant": [
+      "2510.14866"
+    ]
+  },
+  {
+    "id": "ambiguous-physics-bench",
+    "tag": "ambiguous",
+    "query": "benchmarks measuring physical reasoning ability of multimodal models",
+    "relevant": [
+      "2501.16411",
+      "2602.06033"
+    ]
+  },
+  {
+    "id": "ambiguous-vision-illusion",
+    "tag": "ambiguous",
+    "query": "evidence that high benchmark scores do not mean the model really used vision",
+    "relevant": [
+      "2404.12390",
+      "2605.22903"
+    ]
   }
 ]

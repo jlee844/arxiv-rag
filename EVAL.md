@@ -14,13 +14,15 @@ latency: `scripts/bench_latency.py`
 
 ## Eval set
 
-**98 cases = 76 positives + 22 negatives.**
+**119 cases = 97 positives + 22 negatives.**
 
 | source | n | provenance |
 |---|---|---|
 | original | 18 | hand-written |
 | `hand-written-negative` | 19 | hand-written adversarial negatives |
 | `llm-draft-auto-triaged` | 61 | LLM-drafted from abstracts, heuristically triaged |
+| thin-tag expansion | 13 | hand-written, verified against retrieval before adding |
+| capability slice | 8 | hand-written over 6 newly ingested capability benchmarks |
 
 Two anti-circularity rules the set is built on:
 
@@ -36,13 +38,34 @@ should be read as "auto-generated and triaged", not "hand-validated".
 
 ## Retriever ablation
 
-| retriever | recall@5 | MRR | paraphrase (37) | rare (32) | acronym (3) |
-|---|---|---|---|---|---|
-| dense only | 93.42% | 0.877 | 89% | 97% | 100% |
-| BM25 only | 90.79% | 0.846 | 81% | 100% | 100% |
-| **hybrid RRF** | **96.05%** | **0.937** | **92%** | **100%** | 100% |
+Measured at n=97 positives. Every number in the *rejected-techniques* table
+further down was measured at **n=76** and has NOT been re-run against the larger
+set — those rows are labelled accordingly rather than silently rescaled.
 
-Hybrid beats the best single retriever by **+2.63pp recall and +0.060 MRR**,
+| retriever | recall@5 | MRR | paraphrase (37) | rare (32) | capability (6) |
+|---|---|---|---|---|---|
+| dense only | 94.85% | 0.888 | 89% | 97% | MRR **0.889** |
+| BM25 only | 91.75% | 0.840 | 81% | 100% | MRR 0.556 |
+| **hybrid RRF** | **96.91%** | **0.936** | **92%** | **100%** | MRR 0.875 |
+
+**The `capability` slice is the first place fusion is measurably WORSE than a
+single retriever** — dense 0.889 vs hybrid 0.875. These queries name a *capability*
+("physical properties like mass and friction", "which region of an object a person
+could act on") while every candidate paper is topically identical ("a benchmark for
+VLMs"), so BM25 has nothing to lock onto: MRR 0.556, its worst slice by a wide
+margin. RRF then lets that noise pull hybrid below dense. Small n (6) — but it is
+the sharpest statement of the dense/BM25 split in the whole eval, and a concrete
+target for a reranker.
+
+**The 13 thin-tag cases raised every number, which is a warning, not a win.**
+12 of 13 land at rank 1 for hybrid, so they add resolution to `acronym` (3→7),
+`distractor` (1→5), `ambiguous` (2→5) and `easy` (1→3) — the tags that were
+previously too small to report — while *reducing* headroom. Only
+`acronym-minigpt4` (hybrid rank 2) is unsolved. A benchmark whose cases are
+already answered cannot measure a reranker; the next cases added must be
+harder, not merely more numerous.
+
+Hybrid beats the best single retriever by **+2.25pp recall and +0.053 MRR**,
 and the per-tag split shows exactly why: dense wins paraphrase (89 vs 81), BM25
 wins rare technical tokens (100 vs 97), fusion takes both.
 
@@ -61,7 +84,8 @@ RRF scores **cannot** gate: they fuse ranks and discard magnitude by
 construction, which is precisely the signal a relevance gate needs. Raw dense
 cosine retains it.
 
-Threshold sweep over 76 positives / 22 negatives:
+Threshold sweep over 76 positives / 22 negatives (n=76 — predates the
+thin-tag expansion; not re-run):
 
 | threshold | false-abstain | negatives caught |
 |---|---|---|
@@ -202,7 +226,7 @@ Warm re-index of 115 PDFs, byte-identical output:
 
 ## Known limits
 
-- 61 of 76 positives are auto-triaged, not hand-verified.
+- 61 of 89 positives are auto-triaged, not hand-verified.
 - Tag balance is skewed: the generator emits only `paraphrase` and `rare`, so
   `acronym` (3), `ambiguous` (2) and `distractor` (1) remain unresolvable.
 - Tables flattened by PDF text extraction can surface as top hits.

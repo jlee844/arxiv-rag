@@ -13,13 +13,13 @@ repo; the numbers live in [EVAL.md](EVAL.md).
 
 ## Does hybrid retrieval actually help?
 
-Ablated over 76 scored queries, 109 papers / 2960 chunks:
+Ablated over 97 scored queries, 115 papers / 3288 chunks:
 
-| retriever | recall@5 | MRR | paraphrase (37) | rare token (32) |
-|---|---|---|---|---|
-| dense only | 93.42% | 0.877 | 89% | 97% |
-| BM25 only | 90.79% | 0.846 | 81% | 100% |
-| **hybrid RRF** | **96.05%** | **0.937** | **92%** | **100%** |
+| retriever | recall@5 | MRR | paraphrase (37) | rare token (32) | capability (6) |
+|---|---|---|---|---|---|
+| dense only | 94.85% | 0.888 | 89% | 97% | **0.889** |
+| BM25 only | 91.75% | 0.840 | 81% | 100% | 0.556 |
+| **hybrid RRF** | **96.91%** | **0.936** | **92%** | **100%** | 0.875 |
 
 ```bash
 .venv/bin/python scripts/eval_recall.py --ablate
@@ -29,6 +29,12 @@ Dense wins paraphrase, BM25 wins rare technical tokens, fusion takes both. That
 split is the entire argument for hybrid, and it only became visible after the
 eval set grew from 15 to 76 cases — at n=15 all three tied at 93.33%, because
 one case was worth 6.7pp and the effect being measured is 2.6pp.
+
+The `capability` slice is where that argument stops holding: those queries name
+an ability ("physical properties like mass and friction") while every candidate
+paper is topically identical, so BM25 has nothing to match (MRR 0.556) and RRF
+carries that noise into hybrid — the one slice where fusion scores **below**
+dense alone. See [EVAL.md](EVAL.md).
 
 **Stack:** arXiv API → PyMuPDF → sentence-transformers (MPS on Apple Silicon) →
 ChromaDB + BM25 → FastAPI (SSE) → Ollama / OpenAI
@@ -62,8 +68,8 @@ ollama serve                 # keep running in another terminal
 .venv/bin/python scripts/ingest.py --list
 ```
 
-Parses in parallel across all cores and rebuilds BM25 once per run — 115 PDFs
-re-index in 12.7 s.
+Parses in parallel across all cores and rebuilds BM25 once per run — 12.7 s to
+re-index (measured at 109 PDFs; not re-run since the corpus grew to 115).
 
 ### 4. Query — CLI
 
@@ -146,7 +152,7 @@ api.py            FastAPI + SSE streaming, citation check, static web UI
 | `chunk_size` / `chunk_overlap` | 512 / 64 words | |
 | `top_k` / `final_k` | 8 / 5 | per-retriever candidates → LLM context |
 | `rrf_k` | 60 | RRF damping; higher rewards consensus |
-| `min_relevance` | 0.37 | abstain gate on dense cosine |
+| `min_relevance` | 0.35 | abstain gate on dense cosine |
 | `exact_search_max` | 80 000 | above this, fall back to HNSW |
 | `rerank` | `False` | cross-encoder; **measured worse**, see below |
 | `ARXIV_RAG_BACKEND` | `ollama` | or `openai` |
@@ -190,7 +196,7 @@ excerpt headers to cite.
 
 Documented with numbers in [EVAL.md](EVAL.md):
 
-- 61 of 76 positive eval cases are auto-triaged, not hand-verified.
+- 61 of 97 positive eval cases are auto-triaged, not hand-verified.
 - 18% of adversarial negatives still leak past the relevance gate — positives
   and negatives overlap, so no threshold separates them cleanly.
 - One hard paraphrase case is missed by every retriever tested.

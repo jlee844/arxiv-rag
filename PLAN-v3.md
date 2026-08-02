@@ -14,8 +14,8 @@ larger finding than the ablation itself; see `NOTES-changes.md` §8–9.
 |---|---|
 | corpus | 109 papers / 2960 chunks |
 | retrieval | hybrid RRF; dense = exact matmul, deterministic |
-| ablation | dense 93.42% · BM25 90.79% · **hybrid 96.05%** recall@5 (MRR .877/.846/**.937**) |
-| eval set | **98 cases** — 76 positive (61 auto-triaged) + 22 negative |
+| ablation | dense 94.85% · BM25 91.75% · **hybrid 96.91%** recall@5 (MRR .888/.840/**.936**) |
+| eval set | **119 cases** — 97 positive (61 auto-triaged, 21 hand-added) + 22 negative |
 | safety | cosine relevance gate + citation check; injection mitigated, 18% negatives still leak |
 | latency | retrieve 7.7 ms p50 · generation seconds (qwen2.5:14b) |
 | API | **shipped** — SSE streaming, `/api/{health,search,chat}`, web UI on :8001 |
@@ -160,7 +160,7 @@ Then re-run `--ablate`. That run decides whether the headline claim is about
 
 ---
 
-## Phase 3 — Docker
+## Phase 3 — Docker — DONE (built & verified)
 
 **The problem it solves:** running this today means a venv, Ollama, a 9 GB
 model pull, and a 190-second ingest. No hiring manager will do that.
@@ -283,7 +283,7 @@ is better judgment than a fake speedup.
 | 1 | ~~Finish API~~ **DONE** | — | serves on :8001, streaming + gate + web UI |
 | 1.5 | ~~Cross-encoder rerank (B1)~~ **DONE — REJECTED** | — | measured worse on every metric; NOTES §11 |
 | 2 | Promote eval set, re-ablate | 1 h + review | n=79, conclusion decided |
-| 3 | Docker + compose | 1 day | `docker compose up` works clean |
+| 3 | ~~Docker + compose~~ **DONE** | — | 2.62 GB image, 3 s cold start, healthy; NOTES §17 |
 | 4 | S3 + deploy + hosted LLM | 1–2 days | live URL |
 | 5 | ~~Efficiency (C1/C2)~~ **DONE** | — | 71.2 s → 12.7 s, 448 MB → 7.7 MB |
 | 6 | SQS ingest | 1 day | optional |

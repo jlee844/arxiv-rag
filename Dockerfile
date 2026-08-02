@@ -40,6 +40,11 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     HF_HOME=/home/app/.cache/huggingface \
+    # The model is baked in above. Without this, sentence-transformers still
+    # calls huggingface.co on every load and burns 5 retries (~40s) before
+    # falling back to cache — measured. Also removes a hard runtime dependency
+    # on an external host.
+    HF_HUB_OFFLINE=1 \
     OLLAMA_BASE_URL=http://ollama:11434
 
 COPY arxiv_rag/ ./arxiv_rag/
