@@ -125,13 +125,43 @@ positives and never re-run after the eval set grew. See `NOTES-changes.md`
 
 | technique | verdict |
 |---|---|
-| cross-encoder reranking (`ms-marco-MiniLM-L-6-v2`, top-20→5) | MRR 0.900 → 0.867, abstain AUC 0.970 → 0.927, +82 ms; chunk truncation to 200/80 words did not rescue it. Kept behind `Config.rerank=False` so it reproduces via `--rerank`. **It scored the prompt-injection chunk highest of all 22 negatives** — a better relevance model is a better injection amplifier. |
+| cross-encoder reranking (`ms-marco-MiniLM-L-6-v2`, top-20→5) | **Re-measured at n=97:** recall 96.91% → 94.85%, MRR 0.936 → 0.900, +82 ms. Still rejected as a default — but **not uniformly worse**, see the slice split below. Kept behind `Config.rerank=False`, reproduces via `--rerank`. **It scored the prompt-injection chunk highest of all 22 negatives** — a better relevance model is a better injection amplifier. |
 | prompt hardening vs injection | byte-identical output; zero effect |
 | larger embedder (`all-mpnet-base-v2`) | dense recall 93.42% → 90.79%, MRR 0.878 → 0.824, 3.5× slower/query, 37× slower to index |
 | larger `top_k` (12/16/20/30) | recall moves ±1 case (noise); MRR declines monotonically |
 | HyDE (hypothetical document embeddings) | recall 96.05% → 94.74%, 61× latency; invented specifics pull retrieval toward non-existent papers |
 | **hybrid RRF over single retriever** | **kept** — +2.6pp recall, +0.06 MRR |
 | **multi-query expansion** | **kept, opt-in** — recall 96.05% → **98.68%**, fixes all known misses; costs 23× latency and −0.031 MRR |
+
+### Cross-encoder reranking, by slice (n=97)
+
+The aggregate rejection hides an opposite result on two slices:
+
+| tag | n | hybrid | + cross-encoder | Δ |
+|---|---|---|---|---|
+| **capability** | 6 | 0.875 | **0.917** | **+0.042** |
+| **rare** | 32 | 0.975 | **1.000** | **+0.025** |
+| distractor | 5 | 1.000 | 1.000 | 0 |
+| easy | 3 | 1.000 | 1.000 | 0 |
+| acronym | 7 | 0.929 | 0.857 | −0.072 |
+| paraphrase | 37 | 0.901 | 0.827 | −0.074 |
+| ambiguous | 7 | 0.900 | 0.750 | −0.150 |
+
+The cross-encoder wins exactly where fusion is weakest — `capability`, the only
+slice where hybrid scores below dense alone — and loses on `paraphrase` and
+`ambiguous`, which together are 44 of 97 positives and therefore decide the
+aggregate.
+
+Mechanism: a cross-encoder judges whether a passage *answers* the query, which
+is what `capability` queries need and what a bi-encoder cannot do. On
+`ambiguous` it actively hurts, because those cases have several correct papers
+and the reranker collapses toward one — recall drops 100% → 85.7%, the only
+slice where reranking loses a document outright rather than just reordering.
+
+**This refines the rejection rather than reversing it.** The shipped default is
+unchanged. But "reranking does not work here" is too strong; the accurate claim
+is that this cross-encoder trades paraphrase and multi-answer performance for
+capability and rare-token performance, and on this corpus that trade is bad.
 
 ## Query expansion
 
