@@ -1,0 +1,12 @@
+{
+  "//": "Register arxiv-rag as an MCP server. Copy into your client's config:",
+  "//claude-desktop": "~/Library/Application Support/Claude/claude_desktop_config.json",
+  "//claude-code": "run: claude mcp add arxiv-rag -- /ABS/PATH/arxiv-rag/.venv/bin/python -m arxiv_rag.mcp_server",
+  "mcpServers": {
+    "arxiv-rag": {
+      "command": "/ABS/PATH/TO/arxiv-rag/.venv/bin/python",
+      "args": ["-m", "arxiv_rag.mcp_server"],
+      "cwd": "/ABS/PATH/TO/arxiv-rag"
+    }
+  }
+}

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "fig-visual-prompt-accuracy",
+    "query": "how does accuracy change when you draw circles of different sizes and colours on the image as a prompt",
+    "relevant": ["2404.12390"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-blink-tasks",
+    "query": "the benchmark covering fourteen perception tasks a person solves instantly but models fail",
+    "relevant": ["2404.12390"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-confusion-matrix",
+    "query": "confusion matrix showing almost perfect results on in-distribution data but worse out of distribution",
+    "relevant": ["2603.15969"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-dataset-taxonomy",
+    "query": "a chart organising multimodal datasets and benchmarks into four groups",
+    "relevant": ["2505.04921"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-style-transfer-driving",
+    "query": "pictures of driving scenes restyled using text prompts",
+    "relevant": ["2410.21361"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-3d-detection-example",
+    "query": "example images of three dimensional object detection and indoor scene understanding",
+    "relevant": ["2508.19294"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-mcq-extraction-pipeline",
+    "query": "diagram of turning free-form model answers into multiple choice selections for scoring",
+    "relevant": ["2407.04973"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-frequency-domain",
+    "query": "what happens to model predictions when image frequency content is altered, for spotting fakes",
+    "relevant": ["2507.22398"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-frozen-t5-multiview",
+    "query": "architecture where the language model stays frozen while handling several camera views at once",
+    "relevant": ["2403.19838"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-caption-vs-minigpt4",
+    "query": "side by side comparison of generated descriptions against MiniGPT-4",
+    "relevant": ["2408.09720"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-object-mass-case",
+    "query": "worked example of judging how heavy an object is from a picture",
+    "relevant": ["2501.16411"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-data-generation-pipeline",
+    "query": "the stages of building the dataset: collection, alignment, cleaning and segmentation",
+    "relevant": ["2603.09625"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-learnable-verbalizer",
+    "query": "how logits get mapped to task labels through a small learned linear layer",
+    "relevant": ["2408.13040"],
+    "tag": "figure"
+  },
+  {
+    "id": "fig-structural-consistency",
+    "query": "analysis of whether generated traffic scenes stay logically consistent",
+    "relevant": ["2604.08140"],
+    "tag": "figure"
+  }
+]

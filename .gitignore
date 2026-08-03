@@ -38,3 +38,16 @@ NOTES-changes.md
 
 # Personal career notes — not for a public repo
 RESUME.md
+
+# Framework-ablation venv (E1). Isolated on purpose: LlamaIndex/LangChain must
+# never be able to break the shipped retriever's pinned deps.
+.venv-frameworks/
+
+# E1 exported corpus — 7 MB of chunk text, regenerable via
+# `evals/frameworks/export_corpus.py`. The RESULTS in evals/frameworks/results/
+# are small and ARE committed, since they are the measurement.
+evals/frameworks/corpus.jsonl
+
+# Rendered figure crops (~664 PNGs, regenerable via scripts/ingest_figures.py)
+data/figures/
+data/figures_index/

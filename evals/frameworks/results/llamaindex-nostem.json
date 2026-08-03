@@ -1,0 +1,729 @@
+{
+  "n": 97,
+  "recall": 0.9690721649484536,
+  "mrr": 0.9286941580756015,
+  "mrr_paper": 0.929553264604811,
+  "by_tag": {
+    "easy": {
+      "n": 3,
+      "recall": 1.0,
+      "mrr": 1.0
+    },
+    "paraphrase": {
+      "n": 37,
+      "recall": 0.918918918918919,
+      "mrr": 0.8738738738738739
+    },
+    "acronym": {
+      "n": 7,
+      "recall": 1.0,
+      "mrr": 0.8571428571428571
+    },
+    "ambiguous": {
+      "n": 7,
+      "recall": 1.0,
+      "mrr": 1.0
+    },
+    "distractor": {
+      "n": 5,
+      "recall": 1.0,
+      "mrr": 1.0
+    },
+    "rare": {
+      "n": 32,
+      "recall": 1.0,
+      "mrr": 0.984375
+    },
+    "capability": {
+      "n": 6,
+      "recall": 1.0,
+      "mrr": 0.875
+    }
+  },
+  "per_case": [
+    {
+      "id": "easy-title",
+      "tag": "easy",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-hallucination",
+      "tag": "paraphrase",
+      "chunk_rank": null,
+      "paper_rank": null,
+      "rr": 0.0
+    },
+    {
+      "id": "paraphrase-language-prior",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-remote-sensing",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-medical-lay",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "acronym-pope",
+      "tag": "acronym",
+      "chunk_rank": 2,
+      "paper_rank": 2,
+      "rr": 0.5
+    },
+    {
+      "id": "acronym-vlue",
+      "tag": "acronym",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "acronym-elevater",
+      "tag": "acronym",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "ambiguous-survey",
+      "tag": "ambiguous",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "ambiguous-detection",
+      "tag": "ambiguous",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "distractor-benchmark",
+      "tag": "distractor",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-token-korean",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-token-blip-trace",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "path-planning-eval",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "german-factual",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2310.14025",
+      "tag": "paraphrase",
+      "chunk_rank": null,
+      "paper_rank": null,
+      "rr": 0.0
+    },
+    {
+      "id": "paraphrase-2109.01134",
+      "tag": "paraphrase",
+      "chunk_rank": null,
+      "paper_rank": null,
+      "rr": 0.0
+    },
+    {
+      "id": "rare-2307.12114",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-1911.12377",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-1909.10225",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2307.12114",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2404.07214",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2209.07098",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2104.04167",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-0407028",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2505.21089",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2408.09720",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2307.03135",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2410.00982",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2403.17811",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2502.09927",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2010.01177",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2309.04041",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2510.22370",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2504.06925",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2103.04037",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2412.09082",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2306.12174",
+      "tag": "paraphrase",
+      "chunk_rank": 2,
+      "paper_rank": 2,
+      "rr": 0.5
+    },
+    {
+      "id": "paraphrase-2506.18985",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2303.10093",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2603.20985",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2508.05838",
+      "tag": "paraphrase",
+      "chunk_rank": 2,
+      "paper_rank": 2,
+      "rr": 0.5
+    },
+    {
+      "id": "paraphrase-2409.11353",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2603.23521",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2603.15969",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2105.14897",
+      "tag": "paraphrase",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "paraphrase-2410.08397",
+      "tag": "paraphrase",
+      "chunk_rank": 3,
+      "paper_rank": 3,
+      "rr": 0.3333333333333333
+    },
+    {
+      "id": "rare-1911.12377",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-1909.10225",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2209.07098",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2104.04167",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-0407028",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2505.21089",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2408.09720",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2307.03135",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2410.00982",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2403.17811",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2502.09927",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2010.01177",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2310.14025",
+      "tag": "rare",
+      "chunk_rank": 2,
+      "paper_rank": 2,
+      "rr": 0.5
+    },
+    {
+      "id": "rare-2109.01134",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2309.04041",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2510.22370",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2504.06925",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2103.04037",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2412.09082",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2306.12174",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2506.18985",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2303.10093",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2603.20985",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2508.05838",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2409.11353",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2603.23521",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2603.15969",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2105.14897",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "rare-2410.08397",
+      "tag": "rare",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "ambiguous-medical-vlp",
+      "tag": "ambiguous",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "ambiguous-lvlm-bench",
+      "tag": "ambiguous",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "ambiguous-bias",
+      "tag": "ambiguous",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "acronym-lvlm-ehub",
+      "tag": "acronym",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "acronym-clip-td",
+      "tag": "acronym",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "acronym-pptc-r",
+      "tag": "acronym",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "acronym-minigpt4",
+      "tag": "acronym",
+      "chunk_rank": 2,
+      "paper_rank": 2,
+      "rr": 0.5
+    },
+    {
+      "id": "distractor-remote-physio",
+      "tag": "distractor",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "distractor-vocab-transfer",
+      "tag": "distractor",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "distractor-french-tokenize",
+      "tag": "distractor",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "distractor-explainable",
+      "tag": "distractor",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "easy-stellar",
+      "tag": "easy",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "easy-insects",
+      "tag": "easy",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "capability-physical-props",
+      "tag": "capability",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "capability-intuitive-physics",
+      "tag": "capability",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "capability-see-not-perceive",
+      "tag": "capability",
+      "chunk_rank": 4,
+      "paper_rank": 3,
+      "rr": 0.25
+    },
+    {
+      "id": "capability-affordance",
+      "tag": "capability",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "capability-perception-cognition",
+      "tag": "capability",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "capability-face-id",
+      "tag": "capability",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "ambiguous-physics-bench",
+      "tag": "ambiguous",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    },
+    {
+      "id": "ambiguous-vision-illusion",
+      "tag": "ambiguous",
+      "chunk_rank": 1,
+      "paper_rank": 1,
+      "rr": 1.0
+    }
+  ],
+  "llm_calls": 0,
+  "build_s": 8.29,
+  "p50_ms": 33.39,
+  "p95_ms": 43.18,
+  "stemming": false
+}

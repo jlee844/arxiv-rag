@@ -45,17 +45,31 @@ set — those rows are labelled accordingly rather than silently rescaled.
 | retriever | recall@5 | MRR | paraphrase (37) | rare (32) | capability (6) |
 |---|---|---|---|---|---|
 | dense only | 94.85% | 0.888 | 89% | 97% | MRR **0.889** |
-| BM25 only | 91.75% | 0.840 | 81% | 100% | MRR 0.556 |
-| **hybrid RRF** | **96.91%** | **0.936** | **92%** | **100%** | MRR 0.875 |
+| BM25 only | 91.75% | 0.862 | 81% | 100% | MRR 0.611 |
+| **hybrid RRF** | **97.94%** | **0.943** | **95%** | **100%** | MRR 0.867 |
+
+> **Tokenizer change, 2026-08-03.** These are post-stemming numbers. The BM25
+> tokenizer was `text.lower().split()` until the E1 framework ablation showed
+> LlamaIndex's stemmed tokenizer accounted for its entire retrieval lead; see
+> [`evals/frameworks/README.md`](evals/frameworks/README.md). Hybrid moved
+> 96.91% / 0.936 → 97.94% / 0.943, BM25-only 0.840 → 0.862, dense unchanged.
+> **Every row in the rejected-techniques table below predates this change** and
+> was measured against the old tokenizer — they are not re-run here, and are
+> labelled rather than silently rescaled.
 
 **The `capability` slice is the first place fusion is measurably WORSE than a
-single retriever** — dense 0.889 vs hybrid 0.875. These queries name a *capability*
+single retriever** — dense 0.889 vs hybrid 0.867. These queries name a *capability*
 ("physical properties like mass and friction", "which region of an object a person
 could act on") while every candidate paper is topically identical ("a benchmark for
-VLMs"), so BM25 has nothing to lock onto: MRR 0.556, its worst slice by a wide
+VLMs"), so BM25 has nothing to lock onto: MRR 0.611, its worst slice by a wide
 margin. RRF then lets that noise pull hybrid below dense. Small n (6) — but it is
 the sharpest statement of the dense/BM25 split in the whole eval, and a concrete
 target for a reranker.
+
+Stemming did not rescue this slice and slightly widened the gap (hybrid 0.875 →
+0.867 even as BM25-only rose 0.556 → 0.611), which is consistent with the
+diagnosis: the problem is that BM25 has *no lexical signal to find*, not that it
+was matching the signal badly.
 
 **The 13 thin-tag cases raised every number, which is a warning, not a win.**
 12 of 13 land at rank 1 for hybrid, so they add resolution to `acronym` (3→7),
@@ -122,6 +136,13 @@ positives and never re-run after the eval set grew. See `NOTES-changes.md`
 §10/§15.
 
 ## Standard improvements tested and rejected
+
+**All rows below were measured against the pre-stemming BM25 tokenizer**, i.e.
+against a hybrid baseline of 96.91% / 0.936 rather than today's 97.94% / 0.943.
+The verdicts are not automatically invalidated — but a technique that lost by a
+hair to the old baseline would lose by more to the new one, and the
+cross-encoder's `rare`-slice win in particular is worth re-measuring now that
+BM25 handles morphology itself.
 
 | technique | verdict |
 |---|---|
@@ -208,6 +229,110 @@ the same property means a deep single-retriever hit can never climb. Lowering K
 would widen the gap, not close it. Fixing this needs query expansion or a
 domain-tuned embedder; neither is tested.
 
+## Framework ablation (E1): hand-rolled vs LlamaIndex vs LangChain
+
+Same 3288 chunks, same 97 cases, same embedder, same `top_k`/`final_k`/RRF k=60.
+Only the implementation of hybrid retrieval varies. Full method and friction log:
+[`evals/frameworks/README.md`](evals/frameworks/README.md).
+
+| implementation | recall@5 | MRR | build | query p50 |
+|---|---|---|---|---|
+| hand-rolled, pre-stemming | 96.91% | 0.9359 | 2.8 s warm | 11.2 ms |
+| LangChain `EnsembleRetriever` (FAISS + BM25) | 96.91% | 0.9261 | 6.1 s | 9.9 ms |
+| LlamaIndex `QueryFusionRetriever` | **98.97%** | 0.9433 | 8.3 s | 33.5 ms |
+| LlamaIndex, `skip_stemming=True` | 96.91% | 0.9287 | 10.4 s | 33.5 ms |
+| **hand-rolled + stemming (shipped)** | **97.94%** | **0.9428** | 4.6 s warm | **9.5 ms** |
+
+**The framework advantage was a tokenizer default, not an abstraction.**
+LlamaIndex led by 2.06pp until `skip_stemming=True` dropped it to *exactly* the
+hand-rolled score — 96.91% recall, 0.919 paraphrase recall, both to the digit.
+LangChain's BM25 also defaults to `.split()` and matched the old baseline too.
+
+```
+query: "evaluating hallucinations in multimodal models"
+  LlamaIndex : ['evalu', 'hallucin', 'multimod', 'model']
+  arxiv-rag  : ['evaluating', 'hallucinations', 'in', 'multimodal', 'models']
+```
+
+Porting stemming + punctuation splitting + stopword removal into
+`arxiv_rag/index.py::_tokenize` captured the gain and matched LlamaIndex's MRR
+(0.9428 vs 0.9433) at 3.5× lower query latency. **Dense-only scores were
+byte-identical before and after** (94.85% / 0.888), which is the control proving
+only the sparse path moved.
+
+Not free: `acronym` MRR fell 0.929 → 0.857 (one case of seven) and `capability`
+0.875 → 0.867, paying for `paraphrase` recall 0.919 → 0.946, `rare` MRR
+0.975 → 1.000, and `ambiguous` 0.929 → 1.000.
+
+The honest conclusion is not "frameworks add nothing." It is that **the
+frameworks were valuable as an oracle rather than as a dependency** — they
+exposed a defect that a year of self-comparison could not, because this repo's
+eval only ever compared this repo against itself.
+
+## Multimodal: figure retrieval
+
+664 figures extracted from 114/135 papers and indexed as caption chunks, then
+measured on both sides. Reproduce with `scripts/eval_figures.py`.
+
+**Extraction is clip-render, not image extraction.** `page.get_images()` finds
+462 embedded bitmaps in a 25-paper sample and misses **73 pages of vector
+figures** — matplotlib/TikZ plots are PDF drawing operators, not bitmaps, so the
+scatter plots and ablation charts a reader most wants return nothing, silently.
+Rendering the figure *region* captures vector and raster identically.
+
+### The trade, measured on both sides
+
+| | recall@5 | MRR |
+|---|---|---|
+| **A. 97 text cases** — baseline | 97.94% | 0.9428 |
+| A. + figure chunks | **98.97%** | 0.9397 |
+| Δ | **+0.0103** | **−0.0031** |
+| **B. 14 figure cases** — baseline | 71.43% | 0.5833 |
+| B. + figure chunks | **100.00%** | **0.7762** |
+| Δ | **+0.2857** | **+0.1929** |
+
+Figure queries gain **+0.193 MRR**; text queries lose **0.003**. Text recall@5
+actually *rose*, because a caption is a second route to the right paper.
+
+Per-slice, the cost is not evenly spread — it lands on the slices that were
+already weakest:
+
+| tag | n | base | +figures | Δ |
+|---|---|---|---|---|
+| paraphrase | 37 | 0.899 | 0.911 | +0.012 |
+| rare | 32 | 1.000 | 1.000 | +0.000 |
+| acronym | 7 | 0.857 | 0.929 | +0.071 |
+| ambiguous | 7 | 1.000 | 0.929 | −0.071 |
+| **capability** | 6 | 0.867 | **0.742** | **−0.125** |
+
+`capability` is the same slice where BM25 already contributes noise: those
+queries carry no rare tokens, and short caption chunks are topically identical
+to their papers, so they crowd the top-5. Figure chunks take **4.5% of top-5
+slots (22/485) on text queries**.
+
+### Honest limits
+
+- **The 14 figure cases were written by me, knowing this corpus.** They are a
+  hand-built set, not an independent benchmark, and n=14 makes each case worth
+  7pp of recall. The direction is large enough to trust; the magnitude is not.
+- **Extraction precision is good; recall is unmeasured.** 21/135 papers yield
+  zero figures. Extraction is caption-anchored, so a figure whose caption does
+  not parse does not exist.
+- Tables are deliberately excluded — their content is already in the text layer,
+  and the caption-above-content layout produced empty crops.
+- **VLM descriptions (Phase 2) are NOT measured yet.** The caption-only numbers
+  above are the baseline a generated description has to beat;
+  `eval_figures.py --with-descriptions` runs that ablation.
+
+### The bug that only pixels could catch
+
+Validation is layered — caption regex, column ceiling, graphic extent — and
+every layer reasons about *metadata*. A Form XObject fallback ("a tall band with
+no prose must be a figure") looked principled and rendered a **perfectly blank
+212x171 crop**: a real PNG, a plausible file size, nothing in it. No
+metadata-level check could see it. The final gate now measures the non-white
+pixel fraction of the actual render, which costs ~1 ms and is decisive.
+
 ## Security: indirect prompt injection
 
 An indexed paper about hallucination evaluation reproduces its prompt templates
@@ -226,18 +351,30 @@ Full analysis in `NOTES-changes.md` §10.
 
 ## Latency
 
-| stage | p50 |
-|---|---|
-| embed query | ~5 ms |
-| dense (exact matmul) | ~0.04 ms |
-| bm25 | ~1.8 ms |
-| **retrieve e2e** | **~7.7 ms** |
+Re-measured 2026-08-03 at 3288 chunks, `--rounds 15`, after the tokenizer change:
 
-Dense search is exact, not approximate: at 2960 vectors a matmul over a 4.4 MB
-matrix beats HNSW on both latency *and* determinism — HNSW gave six different
-result sets across six identical processes, swinging recall@5 by 13pp. Measured
-crossover where HNSW starts winning is ~80k vectors, above which it is used as a
-fallback. See `NOTES-changes.md` §8-9.
+| stage | p50 | p95 |
+|---|---|---|
+| embed query | 5.1 ms | 8.3 ms |
+| dense (exact matmul) | 0.8 ms | 1.0 ms |
+| bm25 | 1.7 ms | 2.0 ms |
+| **retrieve e2e** | **7.3 ms** | **9.4 ms** |
+
+~134 QPS serial, retrieve-only. **Stemming cost no measurable latency** (bm25
+1.8 → 1.7 ms): the stemmer runs over a handful of query terms, while the
+expensive side of the change — stemming 3288 chunks — is paid once at index
+build.
+
+An earlier version of this table listed dense at ~0.04 ms. That was the matmul
+in isolation at 2960 vectors; the 0.8 ms here is the full `dense_search` call
+including the Chroma metadata fetch, which is the number that actually matters
+to a query.
+
+Dense search is exact, not approximate: a matmul over a ~4.8 MB matrix beats
+HNSW on both latency *and* determinism — HNSW gave six different result sets
+across six identical processes, swinging recall@5 by 13pp. Measured crossover
+where HNSW starts winning is ~80k vectors, above which it is used as a fallback.
+See `NOTES-changes.md` §8-9.
 
 Retrieval is <1% of user-perceived latency once LLM generation is included.
 

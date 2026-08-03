@@ -21,6 +21,8 @@ from __future__ import annotations
 import contextlib
 import json
 import pickle
+import re
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -69,10 +71,62 @@ def _is_noise(chunk: Chunk) -> bool:
     section = " ".join(chunk.section.lower().split())
     return any(token in section for token in _SKIP_SECTIONS)
 
+# Snowball English stemmer, loaded once. Cheap to construct but called ~3.3M
+# times during a corpus rebuild, so it is not rebuilt per call.
+_STEMMER = None
+
+# Stopwords are dropped BEFORE stemming. This is a small, deliberately boring
+# list: BM25's IDF already discounts ubiquitous terms, so the win here is
+# vocabulary size and match precision, not relevance weighting.
+_STOPWORDS = frozenset("""
+a an and are as at be by for from has have he in is it its of on or that the
+to was were will with what which how do does did this these those there their
+""".split())
+
+# Words of 2+ chars, unicode-aware. Matches the token pattern bm25s uses, and
+# critically it SPLITS ON PUNCTUATION — `.split()` leaves "hallucination," and
+# "hallucination" as different tokens, which silently costs recall.
+_TOKEN_RE = re.compile(r"(?u)\b\w\w+\b")
+
+
 def _tokenize(text: str) -> list[str]:
     """Tokenizer for BM25. MUST be identical for corpus and query, or scores
-    are computed against a vocabulary the query can never match."""
-    return text.lower().split()
+    are computed against a vocabulary the query can never match.
+
+    WHY STEMMING — this was measured, not assumed (see EVAL.md, E1):
+
+    The original implementation was `text.lower().split()`. Benchmarking this
+    repo against LlamaIndex's hybrid retriever showed LlamaIndex ahead at
+    recall@5 98.97% vs 96.91%, with `paraphrase` recall 0.973 vs 0.919. Rerunning
+    LlamaIndex with `skip_stemming=True` collapsed it to exactly 96.91% / 0.919
+    — i.e. **the entire framework advantage was this function**, not the
+    abstraction. LangChain, whose BM25 also defaults to `.split()`, scored the
+    same 96.91% as the original.
+
+    Three changes, in descending order of measured impact:
+      1. Stem, so "hallucinations" matches "hallucination". Morphological
+         variants are exactly where a query and a paper's phrasing diverge.
+      2. Split on punctuation, so "GRPO," and "GRPO" are one token.
+      3. Drop stopwords.
+
+    Changing this function INVALIDATES A PERSISTED INDEX: BM25Okapi stores
+    corpus-wide IDF computed over the old vocabulary, so a stale bm25.pkl will
+    score a stemmed query against unstemmed postings and quietly return
+    garbage. `PaperIndex` guards this with a tokenizer fingerprint — see
+    `_TOKENIZER_VERSION`.
+    """
+    global _STEMMER
+    if _STEMMER is None:
+        import Stemmer
+        _STEMMER = Stemmer.Stemmer("english")
+    words = [w for w in _TOKEN_RE.findall(text.lower()) if w not in _STOPWORDS]
+    return _STEMMER.stemWords(words)
+
+
+# Bumped whenever _tokenize changes semantics. Persisted alongside the pickle;
+# a mismatch forces a rebuild instead of silently scoring new queries against
+# an index built with the old vocabulary.
+_TOKENIZER_VERSION = "2-snowball-stopword-punct"
 
 class PaperIndex:
     """Manages the ChromaDB collection and BM25 index together."""
@@ -80,6 +134,7 @@ class PaperIndex:
     COLLECTION_NAME = "arxiv_papers"
     BM25_FILE = "bm25.pkl"
     CORPUS_FILE = "corpus.json"   # parallel list of {chunk_id, text} for BM25
+    TOKENIZER_FILE = "bm25_tokenizer.txt"   # fingerprint; see _load_bm25
 
     def __init__(self, config: Config | None = None):
         self.cfg = config or Config()
@@ -322,12 +377,46 @@ class PaperIndex:
             pickle.dump(self._bm25, f)
         with open(self.cfg.bm25_dir / self.CORPUS_FILE, "w") as f:
             json.dump(self._corpus, f)
+        (self.cfg.bm25_dir / self.TOKENIZER_FILE).write_text(_TOKENIZER_VERSION)
 
     def _load_bm25(self):
+        """Load the persisted BM25 index, REBUILDING it if the tokenizer changed.
+
+        Without this guard, changing `_tokenize` is a silent corruption: the
+        pickle holds postings and IDF over the OLD vocabulary, new queries are
+        tokenized with the NEW scheme, and almost nothing matches. BM25 returns
+        few or no hits, RRF quietly falls back to dense-only, and the system
+        keeps answering — just worse. No exception is ever raised.
+
+        Rebuilding costs ~10 s on this corpus and happens once per tokenizer
+        change, which is a trade worth making every time.
+        """
         bm25_path = self.cfg.bm25_dir / self.BM25_FILE
         corpus_path = self.cfg.bm25_dir / self.CORPUS_FILE
-        if bm25_path.exists() and corpus_path.exists():
-            with open(bm25_path, "rb") as f:
-                self._bm25 = pickle.load(f)
-            with open(corpus_path) as f:
-                self._corpus = json.load(f)
+        if not (bm25_path.exists() and corpus_path.exists()):
+            return
+
+        with open(corpus_path) as f:
+            self._corpus = json.load(f)
+
+        stamp_path = self.cfg.bm25_dir / self.TOKENIZER_FILE
+        stamp = stamp_path.read_text().strip() if stamp_path.exists() else "1-split"
+        if stamp != _TOKENIZER_VERSION:
+            # Stale vocabulary — the pickle is unusable. Rebuild from corpus.json,
+            # which stores raw text and is therefore tokenizer-independent.
+            # STDERR, NOT STDOUT — this is library code, and `mcp_server.py`
+            # speaks JSON-RPC over stdout. A diagnostic printed to stdout is
+            # parsed as a protocol frame:
+            #     Invalid JSON: expected value at line 1 column 2
+            #     input_value='[index] BM25 tokenizer changed...'
+            # It would fire on every fresh clone, because a new checkout has no
+            # stamp file and therefore always rebuilds on first load.
+            print(f"[index] BM25 tokenizer changed ({stamp} -> "
+                  f"{_TOKENIZER_VERSION}); rebuilding over "
+                  f"{len(self._corpus)} chunks", file=sys.stderr)
+            self._rebuild_bm25()
+            self._save_bm25()
+            return
+
+        with open(bm25_path, "rb") as f:
+            self._bm25 = pickle.load(f)

@@ -12,12 +12,12 @@ larger finding than the ablation itself; see `NOTES-changes.md` §8–9.
 
 | | |
 |---|---|
-| corpus | 109 papers / 2960 chunks |
+| corpus | 115 papers / 3288 chunks |
 | retrieval | hybrid RRF; dense = exact matmul, deterministic |
-| ablation | dense 94.85% · BM25 91.75% · **hybrid 96.91%** recall@5 (MRR .888/.840/**.936**) |
+| ablation | dense 94.85% · BM25 91.75% · **hybrid 97.94%** recall@5 (MRR .888/.862/**.943**) — post-stemming, see evals/frameworks/ |
 | eval set | **119 cases** — 97 positive (61 auto-triaged, 21 hand-added) + 22 negative |
-| safety | cosine relevance gate + citation check; injection mitigated, 18% negatives still leak |
-| latency | retrieve 7.7 ms p50 · generation seconds (qwen2.5:14b) |
+| safety | cosine relevance gate + citation check; injection mitigated, 32% negatives leak at the shipped 0.35 gate (18% at 0.40) |
+| latency | retrieve 7.3 ms p50 · generation seconds (qwen2.5:14b) |
 | API | **shipped** — SSE streaming, `/api/{health,search,chat}`, web UI on :8001 |
 | ingest | cold ~190 s (~90% ToS sleep) · **warm re-index 12.7 s** (was 71.2 s) |
 | rejected | cross-encoder rerank · prompt hardening · mpnet · larger top_k |

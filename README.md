@@ -18,8 +18,8 @@ Ablated over 97 scored queries, 115 papers / 3288 chunks:
 | retriever | recall@5 | MRR | paraphrase (37) | rare token (32) | capability (6) |
 |---|---|---|---|---|---|
 | dense only | 94.85% | 0.888 | 89% | 97% | **0.889** |
-| BM25 only | 91.75% | 0.840 | 81% | 100% | 0.556 |
-| **hybrid RRF** | **96.91%** | **0.936** | **92%** | **100%** | 0.875 |
+| BM25 only | 91.75% | 0.862 | 81% | 100% | 0.611 |
+| **hybrid RRF** | **97.94%** | **0.943** | **95%** | **100%** | 0.867 |
 
 ```bash
 .venv/bin/python scripts/eval_recall.py --ablate
@@ -32,9 +32,17 @@ one case was worth 6.7pp and the effect being measured is 2.6pp.
 
 The `capability` slice is where that argument stops holding: those queries name
 an ability ("physical properties like mass and friction") while every candidate
-paper is topically identical, so BM25 has nothing to match (MRR 0.556) and RRF
+paper is topically identical, so BM25 has nothing to match (MRR 0.611) and RRF
 carries that noise into hybrid — the one slice where fusion scores **below**
 dense alone. See [EVAL.md](EVAL.md).
+
+**Where those numbers came from is itself a result.** Hybrid sat at 96.91% /
+0.936 until benchmarking this repo against LlamaIndex and LangChain showed
+LlamaIndex ahead — and the entire gap turned out to be that its BM25 tokenizer
+*stems* while mine called `text.lower().split()`, so `hallucinations` never
+matched `hallucination`. Porting stemming captured the gain at 3.5× lower
+latency than the framework. Details in
+[evals/frameworks/](evals/frameworks/README.md).
 
 **Stack:** arXiv API → PyMuPDF → sentence-transformers (MPS on Apple Silicon) →
 ChromaDB + BM25 → FastAPI (SSE) → Ollama / OpenAI
@@ -104,7 +112,102 @@ curl -N -X POST localhost:8001/api/chat -H 'Content-Type: application/json' \
 in the browser. Every result carries `dense_rank` / `bm25_rank` / `rrf_score`,
 which makes fusion visible rather than asserted.
 
-### 6. Eval / latency / tests
+### 6. MCP server
+
+Exposes retrieval as tools any MCP client can call — no Chroma, BM25, or
+embedding model needed on the caller's side.
+
+```bash
+.venv/bin/python -m arxiv_rag.mcp_server        # stdio
+```
+
+Register it with a client — see [`mcp.json.example`](mcp.json.example), or:
+
+```bash
+claude mcp add arxiv-rag -- "$(pwd)/.venv/bin/python" -m arxiv_rag.mcp_server
+```
+
+| tool | returns |
+|---|---|
+| `search_papers(query, k, mode)` | excerpts + `dense_rank`/`bm25_rank`/`rrf_score` provenance |
+| `list_papers()` | every indexed arXiv id + title |
+| `index_status()` | chunk/paper counts, models, whether exact search is active |
+
+**The trust boundary is the interesting part.** This repo found a live indirect
+prompt injection inside an indexed paper, and fixed it *structurally* — a
+relevance gate that refuses before the LLM is invoked. **An MCP server cannot
+reuse that defence**, because it has no LLM of its own: it hands corpus text to
+the caller's model.
+
+So the server does the only three honest things available to it:
+
+1. **Labels the boundary** — every excerpt is wrapped in explicit
+   `UNTRUSTED PAPER EXCERPT` markers. A hint, not a guarantee.
+2. **Reports the gate instead of enforcing it** — `search_papers` returns
+   `relevance` and `below_relevance_gate`, so the caller can apply the same
+   policy this repo does. Verified: the injection string *"what is the capital
+   of France?"* scores 0.2277 against a 0.35 gate and is flagged.
+3. **Cannot act** — read-only over a local index. No tool here can follow an
+   instruction found in a paper.
+
+It does not *fix* injection. It makes the boundary visible and hands the caller
+the same signal. That is the ceiling for a retrieval server.
+
+### 7. Framework ablation (hand-rolled vs LlamaIndex vs LangChain)
+
+The same hybrid pipeline, built three ways, scored on the same 97 cases over
+byte-identical chunks:
+
+| implementation | recall@5 | MRR | query p50 |
+|---|---|---|---|
+| LangChain `EnsembleRetriever` | 96.91% | 0.9261 | 9.9 ms |
+| LlamaIndex `QueryFusionRetriever` | 98.97% | 0.9433 | 33.5 ms |
+| LlamaIndex, stemming disabled | 96.91% | 0.9287 | 33.5 ms |
+| **hand-rolled (this repo)** | **97.94%** | **0.9428** | **9.5 ms** |
+
+That third row is the point: turning off LlamaIndex's BM25 stemming drops it to
+*exactly* the hand-rolled score, so its lead was a tokenizer default, not an
+abstraction. The frameworks earned their keep here **as an oracle, not as a
+dependency** — they exposed a defect my own eval could never surface, because it
+only ever compared my code against itself.
+
+Full method, per-slice results, and the friction log (LlamaIndex's fusion
+retriever requires an LLM even with generation disabled; LangChain's hybrid
+retriever now spans a *sunset* package and one named *classic*) are in
+[evals/frameworks/README.md](evals/frameworks/README.md).
+
+### 8. Multimodal — figure retrieval
+
+Extracts charts, plots, and diagrams from the PDFs and makes them retrievable.
+
+```bash
+.venv/bin/python scripts/ingest_figures.py     # 664 figures from 114/135 papers
+.venv/bin/python scripts/describe_figures.py   # optional: VLM descriptions
+.venv/bin/python scripts/eval_figures.py       # measures BOTH sides of the trade
+```
+
+**Why clip-render instead of extracting images.** `page.get_images()` finds 462
+embedded bitmaps in a 25-paper sample and **misses 73 pages of vector figures** —
+matplotlib and TikZ plots are PDF drawing operators, not bitmaps, so the ablation
+charts you most want return nothing and no error. Rendering the figure *region*
+captures vector and raster identically.
+
+**The measured trade**, scored on both the 97 text cases and 14 figure cases:
+
+| | recall@5 | MRR |
+|---|---|---|
+| 97 text cases, baseline | 97.94% | 0.9428 |
+| 97 text cases, + figures | 98.97% | 0.9397 |
+| 14 figure cases, baseline | 71.43% | 0.5833 |
+| **14 figure cases, + figures** | **100.00%** | **0.7762** |
+
+Figure queries gain **+0.193 MRR**; text queries lose **0.003** and *gain* 1pp of
+recall. The cost is not evenly spread — it lands on `capability` (−0.125), the
+slice where BM25 already contributes noise. Details and limits in
+[EVAL.md](EVAL.md); the 14 figure cases are hand-written and small, so trust the
+direction more than the magnitude.
+
+### 9. Eval / latency / tests
 
 ```bash
 .venv/bin/python scripts/eval_recall.py --ablate    # retriever comparison
@@ -197,9 +300,15 @@ excerpt headers to cite.
 Documented with numbers in [EVAL.md](EVAL.md):
 
 - 61 of 97 positive eval cases are auto-triaged, not hand-verified.
-- 18% of adversarial negatives still leak past the relevance gate — positives
-  and negatives overlap, so no threshold separates them cleanly.
+- **32% of adversarial negatives (7/22) leak past the relevance gate** at the
+  shipped 0.35 threshold. Positives and negatives overlap — max negative 0.623,
+  min positive 0.357 — so no threshold separates them cleanly. (An earlier
+  README said 18%; that is the leak rate at 0.40, not at the shipped default.
+  Raising to 0.40 buys it at the cost of 1 false abstain: `--gate` prints the
+  sweep.)
 - One hard paraphrase case is missed by every retriever tested.
+- Stemming the BM25 tokenizer cost `acronym` MRR (0.929 → 0.857, one case of
+  seven) to buy `paraphrase` and `rare`. Net positive, not free.
 - PDF tables flatten into token soup and can surface as top hits.
 
 ## License
