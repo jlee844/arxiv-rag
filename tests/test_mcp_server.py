@@ -77,3 +77,22 @@ def test_list_papers_is_cached_and_invalidates_on_corpus_change():
     fresh = m.list_papers()
     assert fresh["count"] == first["count"]
     assert fresh != {"count": -1, "papers": ["STALE"]}
+
+
+def test_search_figures_distinguishes_empty_from_unindexed():
+    """An empty result must not be ambiguous.
+
+    "no figures matched" and "figures were never indexed" produce the same empty
+    list, and a caller cannot tell them apart. `figures_in_index` reports which
+    situation it is.
+    """
+    r = m.search_figures("scatter plot of accuracy against model size", k=3)
+    assert "indexed_figures" in r and "figures_in_index" in r
+    if r["indexed_figures"]:
+        assert r["count"] >= 1
+        top = r["results"][0]
+        assert top["image_path"].endswith(".png")
+        # Captions carry the same untrusted marker as text excerpts.
+        assert "UNTRUSTED PAPER EXCERPT" in top["caption"]
+        # The label must not be duplicated into the caption body.
+        assert not top["caption"].count(top["label"]) > 1

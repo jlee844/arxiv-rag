@@ -79,7 +79,8 @@ def test_handshake_and_tool_list_over_stdio():
         tools = await s.list_tools()
         return sorted(t.name for t in tools.tools)
 
-    assert _run(go) == ["index_status", "list_papers", "search_papers"]
+    assert _run(go) == ["index_status", "list_papers", "search_figures",
+                        "search_papers"]
 
 
 def test_search_round_trips_json_over_stdio():

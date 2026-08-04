@@ -128,6 +128,24 @@ def main(keep, with_descriptions):
                    "run scripts/describe_figures.py (caption-only results follow)")
 
     base_index = PaperIndex(cfg)
+
+    # The A/B is only meaningful while the LIVE index is figure-free. Once
+    # `ingest_figures.py --index` has run, the "baseline" arm already contains
+    # figure chunks, both arms become identical, and this script would report
+    # a delta of ~0 — which reads as "figures do nothing" rather than "this
+    # comparison is no longer runnable".
+    present = set(base_index._col.get(ids=[f["figure_id"] for f in manifest])["ids"])
+    if present:
+        sys.exit(
+            f"\nCANNOT RUN — the live index already contains {len(present)} "
+            f"figure chunks, so the baseline arm is not figure-free and both "
+            f"arms would be identical.\n"
+            f"  This A/B is a pre-adoption measurement. The result it produced "
+            f"is recorded in EVAL.md.\n"
+            f"  To re-run it, rebuild a figure-free index first "
+            f"(scripts/ingest.py into a clean data dir).\n"
+        )
+
     click.echo(f"baseline index: {base_index.count()} chunks")
     click.echo(f"manifest: {len(manifest)} figures")
 

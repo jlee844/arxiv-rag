@@ -37,7 +37,11 @@ from arxiv_rag.figures import extract_figures
 @click.option("--limit", type=int, default=None, help="Only process N papers.")
 @click.option("--dpi", type=int, default=150,
               help="Render resolution. 150 keeps axis labels VLM-legible.")
-def main(limit, dpi):
+@click.option("--index", "do_index", is_flag=True,
+              help="Also add figure CAPTIONS to the live index. Off by "
+                   "default: this changes retrieval for every existing "
+                   "query, so run scripts/eval_figures.py first.")
+def main(limit, dpi, do_index):
     cfg = Config()
     pdf_dir = cfg.data_dir / "pdfs"
     out_dir = cfg.data_dir / "figures"
@@ -84,6 +88,56 @@ def main(limit, dpi):
         for aid, err in failed[:5]:
             click.echo(f"  {aid}: {err[:90]}")
     click.echo(f"\nwrote {manifest_path}")
+
+    if not do_index:
+        click.echo("\nnot indexed (use --index). Measure first: "
+                   "scripts/eval_figures.py")
+        return
+
+    # Captions only. VLM descriptions were measured and REJECTED — appending
+    # them dropped figure recall@5 from 100% to 85.7% by diluting a short,
+    # precise caption with generic prose (EVAL.md). The manifest keeps them so
+    # the negative result stays reproducible; the index does not.
+    from arxiv_rag.index import PaperIndex
+    from arxiv_rag.parse import Chunk
+
+    index = PaperIndex(cfg)
+    before = index.count()
+
+    # ORDER MATTERS. Delete existing figure chunks FIRST, then compute which
+    # papers the TEXT index knows about.
+    #
+    # Getting this backwards made the orphan filter a silent no-op: figure
+    # chunks from a previous run were already in the index, so their arxiv_ids
+    # appeared in `indexed_papers()` and every orphan validated itself.
+    stale = [f["figure_id"] for f in all_figs]
+    existing = set(index._col.get(ids=stale)["ids"])
+    if existing:
+        index._col.delete(ids=list(existing))
+        index._corpus = [c for c in index._corpus if c["chunk_id"] not in existing]
+        click.echo(f"replacing {len(existing)} existing figure chunks")
+
+    # Only index figures whose PAPER is already in the text index. Extraction
+    # walks every PDF on disk, and ~20 of them were never ingested into Chroma —
+    # indexing their figures silently grew the corpus from 115 to 132 "papers"
+    # and made figures retrievable for documents whose text is not.
+    known = set(index.indexed_papers())
+    orphans = [f for f in all_figs if f["arxiv_id"] not in known]
+    all_figs = [f for f in all_figs if f["arxiv_id"] in known]
+    if orphans:
+        click.echo(f"skipping {len(orphans)} figures from "
+                   f"{len({o['arxiv_id'] for o in orphans})} papers whose text "
+                   f"is not indexed")
+
+    chunks = [
+        Chunk(chunk_id=f["figure_id"], arxiv_id=f["arxiv_id"], title="",
+              authors="", published="", section=f["label"],
+              text=f"{f['label']}: {f['caption']}", chunk_index=i)
+        for i, f in enumerate(all_figs)
+    ]
+    with index.batch():
+        added = index.add_chunks(chunks)
+    click.echo(f"indexed {added} figure captions  ({before} -> {index.count()} chunks)")
 
 
 if __name__ == "__main__":

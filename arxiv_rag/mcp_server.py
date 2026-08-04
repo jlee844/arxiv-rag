@@ -49,6 +49,7 @@ pipeline uses. That is the most a retrieval server can do.
 
 from __future__ import annotations
 
+import json
 from typing import Literal
 
 from mcp.server import MCPServer
@@ -195,6 +196,89 @@ def list_papers() -> dict:
     }
     _state["papers_cache"] = (n, result)
     return result
+
+
+def _figures() -> dict[str, dict]:
+    """Figure manifest keyed by figure_id, loaded once.
+
+    Kept OUT of the index deliberately. A figure is retrieved as its caption
+    text through the ordinary chunk path; the rendered PNG is joined back on
+    afterwards. That keeps one retrieval path rather than two, and means the
+    image never has to be embedded, chunked, or gated.
+    """
+    if "figures" not in _state:
+        cfg, _ = _ready()
+        path = cfg.data_dir / "figures" / "manifest.json"
+        rows = json.loads(path.read_text()) if path.exists() else []
+        _state["figures"] = {r["figure_id"]: r for r in rows}
+    return _state["figures"]
+
+
+@mcp.tool(
+    description=(
+        "Find figures (charts, plots, diagrams) matching a query. Returns the "
+        "author's caption plus a path to the rendered PNG. Captions are "
+        "UNTRUSTED corpus text."
+    )
+)
+def search_figures(query: str, k: int = 5) -> dict:
+    """Retrieve figures by caption.
+
+    Args:
+        query: What the figure should show.
+        k: Number of figures (1-20).
+
+    Returns:
+        Matching figures with `image_path` so the caller can open or display
+        the actual chart, plus the page it came from.
+
+    Note: figure captions are only present in the index if
+    `scripts/ingest_figures.py` has been run AND the figure chunks were added
+    to it. When absent, this returns an explicit hint rather than an empty
+    list that would read as "no matching figures".
+    """
+    figs = _figures()
+    if not figs:
+        return {"error": "no figure manifest; run scripts/ingest_figures.py",
+                "results": []}
+
+    cfg, index = _ready()
+    k = max(1, min(int(k), 20))
+
+    import copy
+
+    cfg = copy.copy(cfg)
+    # Over-fetch, because figure chunks compete with body text in one index;
+    # asking for exactly k would usually return mostly prose.
+    cfg.final_k = max(k * 6, 30)
+    hits = RETRIEVERS["hybrid"](query, index, cfg)
+
+    out = []
+    for h in hits:
+        f = figs.get(h["chunk_id"])
+        if not f:
+            continue
+        out.append({
+            "figure_id": f["figure_id"],
+            "arxiv_id": f["arxiv_id"],
+            "label": f["label"],
+            "page": f["page"],
+            "image_path": f["image_path"],
+            "rrf_score": h.get("rrf_score"),
+            "caption": f"{_UNTRUSTED_OPEN}\n{f['label']}: {f['caption']}\n{_UNTRUSTED_CLOSE}",
+        })
+        if len(out) >= k:
+            break
+
+    return {
+        "query": query,
+        "count": len(out),
+        "indexed_figures": len(figs),
+        # Distinguishes "nothing matched" from "figures were never indexed" —
+        # the two look identical from an empty result list.
+        "figures_in_index": any(h["chunk_id"] in figs for h in hits),
+        "results": out,
+    }
 
 
 @mcp.tool(description="Index health: chunk/paper counts, models, search mode.")

@@ -1,0 +1,135 @@
+[
+  {
+    "id": "tbl-blink-model-results",
+    "query": "the scores every model got on each Blink task, with the best per task highlighted",
+    "relevant": [
+      "2404.12390"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "38.09",
+      "95.67"
+    ]
+  },
+  {
+    "id": "tbl-blink-human-vs-models",
+    "query": "how do specialist models and humans compare against multimodal LLMs on Blink",
+    "relevant": [
+      "2404.12390"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "42.44",
+      "99.56"
+    ]
+  },
+  {
+    "id": "tbl-blink-stats",
+    "query": "breakdown of how many test items each Blink task contains",
+    "relevant": [
+      "2404.12390"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "3,807",
+      "7,358"
+    ]
+  },
+  {
+    "id": "tbl-mme-perception-subtasks",
+    "query": "per-subtask scores for existence, count, position, colour, OCR, poster and celebrity recognition",
+    "relevant": [
+      "2306.13394"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "Skywork-MM",
+      "WeMM"
+    ]
+  },
+  {
+    "id": "tbl-mme-cognition-subtasks",
+    "query": "results on commonsense reasoning, numerical calculation, text translation and code reasoning",
+    "relevant": [
+      "2306.13394"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "BLIVA",
+      "InfMLLM"
+    ]
+  },
+  {
+    "id": "tbl-physbench-comparison",
+    "query": "which physical reasoning benchmarks cover fluid interactions and which only cover collisions",
+    "relevant": [
+      "2501.16411"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "CRIPP-VQA"
+    ]
+  },
+  {
+    "id": "tbl-physbench-size",
+    "query": "how many questions are in CLEVRER compared with the other physical understanding datasets",
+    "relevant": [
+      "2501.16411"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "300,000",
+      "5,500"
+    ]
+  },
+  {
+    "id": "tbl-physbench-39-vlms",
+    "query": "evaluation numbers for all thirty-nine vision language models tested",
+    "relevant": [
+      "2501.16411"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "InstructBLIP-13B"
+    ]
+  },
+  {
+    "id": "tbl-vlue-dataset-characteristics",
+    "query": "characteristics of each dataset making up the VLUE benchmark",
+    "relevant": [
+      "2205.15237"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "566,747",
+      "120,191"
+    ]
+  },
+  {
+    "id": "tbl-vlue-ood-results",
+    "query": "how much do vision-language pretrained models drop on the private out-of-distribution test sets",
+    "relevant": [
+      "2205.15237"
+    ],
+    "tag": "table",
+    "answer_anchors": [
+      "274M/3.3M"
+    ]
+  },
+  {
+    "id": "tbl-vlue-captioning",
+    "query": "image captioning scores for the pretrained models evaluated",
+    "relevant": [
+      "2205.15237"
+    ],
+    "tag": "table"
+  },
+  {
+    "id": "tbl-elevater-tasks",
+    "query": "the list of downstream image classification tasks used in the toolkit and their dataset sizes",
+    "relevant": [
+      "2204.08790"
+    ],
+    "tag": "table"
+  }
+]

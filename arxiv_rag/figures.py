@@ -250,7 +250,11 @@ def extract_figures(
                 m = _CAPTION_RE.match(text)
                 if not m:
                     continue
-                caption = " ".join(text.split())
+                # Store the caption WITHOUT its "Figure 3:" prefix — `label`
+                # already carries that. Keeping both duplicated it into every
+                # indexed chunk ("Figure 2: Figure 2: Plot of accuracy..."),
+                # which wastes tokens and doubles "figure"/the number for BM25.
+                caption = " ".join(m.group("rest").split())
                 if len(caption) < _MIN_CAPTION_CHARS:
                     continue
 

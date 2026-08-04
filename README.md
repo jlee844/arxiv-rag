@@ -131,6 +131,7 @@ claude mcp add arxiv-rag -- "$(pwd)/.venv/bin/python" -m arxiv_rag.mcp_server
 |---|---|
 | `search_papers(query, k, mode)` | excerpts + `dense_rank`/`bm25_rank`/`rrf_score` provenance |
 | `list_papers()` | every indexed arXiv id + title |
+| `search_figures(query, k)` | matching charts/plots + a path to the rendered PNG |
 | `index_status()` | chunk/paper counts, models, whether exact search is active |
 
 **The trust boundary is the interesting part.** This repo found a live indirect
@@ -181,10 +182,13 @@ retriever now spans a *sunset* package and one named *classic*) are in
 Extracts charts, plots, and diagrams from the PDFs and makes them retrievable.
 
 ```bash
-.venv/bin/python scripts/ingest_figures.py     # 664 figures from 114/135 papers
-.venv/bin/python scripts/describe_figures.py   # optional: VLM descriptions
-.venv/bin/python scripts/eval_figures.py       # measures BOTH sides of the trade
+.venv/bin/python scripts/ingest_figures.py --index   # extract + index captions
+.venv/bin/python scripts/eval_tables.py              # findability vs answerability
+.venv/bin/python scripts/describe_figures.py         # VLM captions (measured worse)
 ```
+
+Shipped: **3801 chunks / 116 papers** — text recall@5 **98.97%**, figure cases
+**100%**, table cases 83.3%.
 
 **Why clip-render instead of extracting images.** `page.get_images()` finds 462
 embedded bitmaps in a 25-paper sample and **misses 73 pages of vector figures** —
@@ -203,9 +207,16 @@ captures vector and raster identically.
 
 Figure queries gain **+0.193 MRR**; text queries lose **0.003** and *gain* 1pp of
 recall. The cost is not evenly spread — it lands on `capability` (−0.125), the
-slice where BM25 already contributes noise. Details and limits in
-[EVAL.md](EVAL.md); the 14 figure cases are hand-written and small, so trust the
-direction more than the magnitude.
+slice where BM25 already contributes noise.
+
+**VLM descriptions were measured and rejected.** Captioning all 664 figures with
+`qwen2.5vl:7b` and appending the result to the author caption made every headline
+number *worse* — figure recall@5 100% → 85.7%, figure MRR 0.776 → 0.726. The
+descriptions are accurate; the problem is dilution, since generic prose
+("image", "plot", "axis") lowers the caption's term specificity. Kept behind
+`--with-descriptions` so the negative result stays reproducible. Details and
+limits in [EVAL.md](EVAL.md); the 14 figure cases are hand-written and small, so
+trust the direction more than the magnitude.
 
 ### 9. Eval / latency / tests
 
