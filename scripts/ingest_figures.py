@@ -37,11 +37,13 @@ from arxiv_rag.figures import extract_figures
 @click.option("--limit", type=int, default=None, help="Only process N papers.")
 @click.option("--dpi", type=int, default=150,
               help="Render resolution. 150 keeps axis labels VLM-legible.")
+@click.option("--tables", is_flag=True,
+              help="Also extract TABLE regions (caption side auto-detected).")
 @click.option("--index", "do_index", is_flag=True,
               help="Also add figure CAPTIONS to the live index. Off by "
                    "default: this changes retrieval for every existing "
                    "query, so run scripts/eval_figures.py first.")
-def main(limit, dpi, do_index):
+def main(limit, dpi, tables, do_index):
     cfg = Config()
     pdf_dir = cfg.data_dir / "pdfs"
     out_dir = cfg.data_dir / "figures"
@@ -62,7 +64,7 @@ def main(limit, dpi, do_index):
     for pdf in tqdm(pdfs, desc="extracting"):
         aid = pdf.stem
         try:
-            figs = extract_figures(pdf, aid, out_dir, dpi=dpi)
+            figs = extract_figures(pdf, aid, out_dir, dpi=dpi, tables=tables)
         except Exception as exc:                          # noqa: BLE001
             # One malformed PDF must not lose the whole run. This corpus
             # already contains files that emit MuPDF colorspace errors.

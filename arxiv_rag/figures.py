@@ -162,6 +162,68 @@ def _column_ceiling(blocks, caption_rect: fitz.Rect, page_rect: fitz.Rect) -> fl
     return ceiling
 
 
+def _is_body_sentence(text: str) -> bool:
+    """True only for running prose. Table ROWS must not qualify.
+
+    `_is_prose` (>= 8 words) is right for figures — it separates body text from
+    axis labels. It is wrong as a TABLE boundary, and that mistake cost two
+    rounds of debugging: a row like
+
+        CLEVRER (Yi et al., 2019) ✓ ✗ ✗ ✗ ✗ ✗ ✗ ✓ ✗ ✗ ✗ 300,000 ✗
+
+    has 14 "words", so every table row counted as prose and bounded the region
+    to ~5 pt. Both candidate bands collapsed and zero tables were extracted.
+
+    Running prose has sentence punctuation and few digits; a table row is the
+    opposite. Thresholds mirror `is_table_soup` in distill-lab, which solved the
+    same discrimination problem from the other direction.
+    """
+    words = text.split()
+    if len(words) < 8:
+        return False
+    digits = sum(c.isdigit() for c in text)
+    symbols = sum(c in "✓✗×√±%|" for c in text)
+    if (digits + symbols) / max(len(text), 1) > 0.10:
+        return False
+    # Running prose ends sentences. A row of cells rarely contains ". "
+    return text.count(". ") + text.count(", ") >= 1
+
+
+def _column_floor(blocks, caption_rect: fitz.Rect, page_rect: fitz.Rect) -> float:
+    """Top edge of the nearest BODY PROSE below the caption, in the same column.
+
+    The mirror of `_column_ceiling`, and it exists because table geometry is
+    inverted: a table caption sits ABOVE its content, so the region runs
+    downward.
+
+    THE SUBTLETY THAT BROKE THE FIRST ATTEMPT: taking the immediately-following
+    block gives the whitespace gap between the caption and the table body,
+    because the table body IS text and arrives as its own blocks. That produced
+    six zero-byte crops. A table must be bounded by the next block of *prose*,
+    skipping the short cell-text blocks that make up the table itself — the same
+    `_is_prose` distinction that keeps axis labels from clipping a figure.
+    """
+    floor = page_rect.y1
+    for rect, text in blocks:
+        if rect.y0 < caption_rect.y1:
+            continue                       # not below the caption
+        if rect.x1 <= caption_rect.x0 or rect.x0 >= caption_rect.x1:
+            continue                       # different column
+        if not _is_body_sentence(text):
+            continue                       # table cell text, not a boundary
+        floor = min(floor, rect.y0)
+    return floor
+
+
+def _text_density(page, band: fitz.Rect) -> int:
+    """Characters of text inside `band`. A table is dense text, not drawings."""
+    n = 0
+    for rect, text in _blocks(page):
+        if rect.intersects(band):
+            n += len(text)
+    return n
+
+
 def _graphic_extent(page, band: fitz.Rect) -> tuple[fitz.Rect | None, int, int]:
     """Union of drawing/image geometry inside `band`.
 
@@ -220,6 +282,7 @@ def extract_figures(
     arxiv_id: str,
     out_dir: Path | str,
     dpi: int = 150,
+    tables: bool = False,
 ) -> list[Figure]:
     """Extract every captioned figure/table from one PDF.
 
@@ -258,60 +321,93 @@ def extract_figures(
                 if len(caption) < _MIN_CAPTION_CHARS:
                     continue
 
-                # TABLES ARE DELIBERATELY SKIPPED. Their caption sits above
-                # typeset text, so the "band" is the whitespace between caption
-                # and table body — the first version rendered 6 zero-byte PNGs
-                # from exactly that. And a table's content is already in the
-                # text layer and already indexed, so an image of it adds no
-                # retrievable signal. Captions are still matched so the regex
-                # stays honest about what it saw.
-                if m.group("kind").lower().startswith("tab"):
+                is_table = m.group("kind").lower().startswith("tab")
+                if is_table and not tables:
                     continue
 
-                kind = "figure"
-                label = f"Figure {m.group('num')}"
+                kind = "table" if is_table else "figure"
+                label = f"{'Table' if is_table else 'Figure'} {m.group('num')}"
                 fid = f"{arxiv_id}-p{pno}-{kind}{m.group('num')}"
                 if fid in seen:
                     continue
 
-                # Band = from the text above (same column) down to the caption.
-                ceiling = _column_ceiling(blocks, rect, page_rect)
-                # Horizontal extent is the CAPTION's column, not the page. A
-                # full-width band on a two-column paper crops the neighbour.
-                pad = 6.0
-                band = fitz.Rect(
-                    max(page_rect.x0, rect.x0 - pad), ceiling,
-                    min(page_rect.x1, rect.x1 + pad), rect.y0,
-                )
-                if band.height < _MIN_REGION_PT:
-                    continue
+                if is_table:
+                    # DO NOT ASSUME WHICH SIDE THE CAPTION IS ON. The first
+                    # version hardcoded "table captions sit above their content"
+                    # — the standard claim — and extracted ZERO tables from this
+                    # corpus. Measured on 2501.16411 p2: caption at y=463-497,
+                    # next prose at y=503, so the band below it was 6 pt tall
+                    # with no text in it. The table was ABOVE the caption.
+                    #
+                    # Caption placement is a venue/template choice and varies
+                    # within a single corpus, so both directions are measured and
+                    # the denser one wins. Text density is the right arbiter
+                    # because a table IS dense text, unlike a figure.
+                    pad = 6.0
+                    x0 = max(page_rect.x0, rect.x0 - pad)
+                    x1 = min(page_rect.x1, rect.x1 + pad)
+                    below = fitz.Rect(x0, rect.y1, x1,
+                                      _column_floor(blocks, rect, page_rect))
+                    # Table-aware ceiling: same rule as the floor, or the band
+                    # above collapses on table rows exactly as the band below did.
+                    t_ceiling = page_rect.y0
+                    for r2, t2 in blocks:
+                        if r2.y1 > rect.y0 or r2.x1 <= rect.x0 or r2.x0 >= rect.x1:
+                            continue
+                        if _is_body_sentence(t2):
+                            t_ceiling = max(t_ceiling, r2.y1)
+                    above = fitz.Rect(x0, t_ceiling, x1, rect.y0)
+                    cands = [b for b in (above, below)
+                             if b.height >= _MIN_REGION_PT and b.width > 0]
+                    if not cands:
+                        continue
+                    band = max(cands, key=lambda b: _text_density(page, b))
+                    # A table is dense text, so the figure test (drawings or
+                    # images present) is the wrong validation entirely — most
+                    # tables have neither. Require characters instead.
+                    if _text_density(page, band) < 80:
+                        continue
+                    region, n_draw, n_img = band, 0, 0
+                else:
+                    # FIGURE: caption BELOW, graphic above.
+                    ceiling = _column_ceiling(blocks, rect, page_rect)
+                    # Horizontal extent is the CAPTION's column, not the page. A
+                    # full-width band on a two-column paper crops the neighbour.
+                    pad = 6.0
+                    band = fitz.Rect(
+                        max(page_rect.x0, rect.x0 - pad), ceiling,
+                        min(page_rect.x1, rect.x1 + pad), rect.y0,
+                    )
+                    if band.height < _MIN_REGION_PT:
+                        continue
 
-                extent, n_draw, n_img = _graphic_extent(page, band)
-                has_graphics = extent is not None and (n_draw >= _MIN_DRAW_OPS or n_img > 0)
+                    extent, n_draw, n_img = _graphic_extent(page, band)
+                    has_graphics = (extent is not None
+                                    and (n_draw >= _MIN_DRAW_OPS or n_img > 0))
 
-                # FALLBACK for Form XObjects. An included EPS/PDF figure is a
-                # single form object: `get_drawings()` does not descend into it
-                # and `get_image_info()` does not list it, so both report zero.
-                # Measured on 0112004v1 — a healthy 212x171 pt band, draw=0,
-                # img=0, and a real figure sitting in it.
-                #
-                # A tall band in this column containing NO body prose is a
-                # figure by elimination: prose would have set the ceiling.
-                prose_inside = any(
-                    _is_prose(t) and r.intersects(band) for r, t in blocks
-                )
-                if not has_graphics and not (band.height >= 80.0 and not prose_inside):
-                    # Require actual graphics. Without this, every "As Figure 3
-                    # shows..." that begins a paragraph crops a slab of prose.
-                    continue
+                    # FALLBACK for Form XObjects. An included EPS/PDF figure is a
+                    # single form object: `get_drawings()` does not descend into
+                    # it and `get_image_info()` does not list it, so both report
+                    # zero. Measured on 0112004v1 — a healthy 212x171 pt band,
+                    # draw=0, img=0, and a real figure sitting in it.
+                    #
+                    # A tall band in this column containing NO body prose is a
+                    # figure by elimination: prose would have set the ceiling.
+                    prose_inside = any(
+                        _is_prose(t) and r.intersects(band) for r, t in blocks
+                    )
+                    if not has_graphics and not (band.height >= 80.0
+                                                 and not prose_inside):
+                        # Without this, every "As Figure 3 shows..." that begins
+                        # a paragraph crops a slab of prose.
+                        continue
 
-                # Intersect the graphic extent with the band: the extent alone
-                # can spill across the page (a full-width rule inside a
-                # one-column figure), the band alone can include leading
-                # whitespace.
-                region = (extent & band) if extent is not None else band
-                if region.is_empty:
-                    region = band
+                    # Intersect extent with band: the extent alone can spill
+                    # across the page (a full-width rule inside a one-column
+                    # figure), the band alone can include leading whitespace.
+                    region = (extent & band) if extent is not None else band
+                    if region.is_empty:
+                        region = band
 
                 if region.height < _MIN_REGION_PT or region.width < _MIN_REGION_PT:
                     continue

@@ -452,6 +452,101 @@ Not yet attempted — the metric exists first, deliberately.
 Limits: n=12, hand-written; 2 cases have no verified anchors and are excluded
 from answerability; `tbl-physbench-39-vlms` is not retrieved at all.
 
+## Table crops + VLM transcription (in progress)
+
+Tables were originally excluded from figure extraction — caption-above-content
+produced six zero-byte crops. Re-attempted, and the geometry turned out to be
+harder than figures for two reasons, **both of which were wrong assumptions
+rather than bugs**:
+
+1. **Caption placement is not fixed.** The standard claim is that table captions
+   sit above their content. Measured on 2501.16411 p2: caption at y=463-497,
+   next prose at y=503 — a 6 pt band with nothing in it, because the table was
+   *above* the caption. Placement is a venue/template choice and varies within
+   one corpus, so both directions are now measured and the denser one wins.
+2. **Table rows read as prose.** `_is_prose` (>= 8 words) is the right boundary
+   for figures — it stops axis labels from clipping a chart. It is wrong for
+   tables: a row like `CLEVRER (Yi et al., 2019) ✓ ✗ ✗ ... 300,000 ✗` has 14
+   "words", so every row counted as a boundary and collapsed the band to ~5 pt.
+   **Zero tables extracted, with no error.** Fixed with `_is_body_sentence`,
+   which additionally requires low digit/symbol density and sentence
+   punctuation.
+
+Result: **52 tables from 5 papers**, verified by looking at the crops, not by
+counting them.
+
+### The VLM recovers what the text layer destroys
+
+`qwen2.5vl:7b` (already installed, no new dependency) transcribing the PhysBench
+Table 1 crop to markdown, ~8-12 s:
+
+| anchor | text layer | VLM crop |
+|---|---|---|
+| `300,000`, `5,500`, `99,844` | present but unbound | **bound to their row** |
+| column headers | collapsed into one run | **preserved** |
+| row labels (CLEVRER, Cater, …) | present but unbound | **preserved** |
+| ✓/✗ → column binding | **destroyed** | **restored** |
+
+A first prompt recovered the grid and the numbers but **dropped the row-label
+column entirely**, leaving anonymous rows — useless for *"which benchmarks cover
+fluid interactions"*. That column has no header in the original, so the model
+skipped it. Naming it explicitly in the prompt fixed it.
+
+### Measured: transcription helps, and does not fix it
+
+619 tables transcribed with `qwen2.5vl:7b` and added to a throwaway index copy:
+
+| | baseline | + VLM markdown |
+|---|---|---|
+| recall@5 (findability) | 83.3% | 83.3% |
+| **answerable@5** | 0.50 (5/10) | **0.60 (6/10)** |
+| **table chunk in top-5** | 0/10 | **3/10** |
+| structure failures | — | **0** |
+| ranking failures | — | **3** |
+
+**Zero structure failures.** There is no case where a table chunk was retrieved
+and its data was unreadable. Every remaining failure is a chunk that never
+surfaced at all.
+
+**This retracts a claim made earlier on this page.** It previously read: *"that
+33pp gap is the number a structured parser (PaddleOCR-VL) must move."* That is
+wrong. A parser can only improve chunks that get retrieved, and the diagnostic
+says 3 of the 4 remaining failures are chunks that are never retrieved. Better
+parsing cannot reach them.
+
+**A prediction recorded before the run was also half wrong.** I predicted markdown
+would fix readability but not embeddability — that a grid of `Y | N | N` would
+still lose to a well-formed English sentence. It did help: table chunks went
+0/10 -> 3/10 retrieved, and one case flipped to answerable. Restoring row labels
+and headers apparently gives the chunk enough real vocabulary to compete. Just
+not enough, three times out of ten.
+
+### The diagnostic printed a confident verdict twice while measuring nothing
+
+Both earlier runs reported `FAILURE SPLIT structure=0 ranking=4 -> RANKING
+DOMINATES`, which reads exactly like a finding. Neither was one:
+
+- **Run 1**: the live index contains no table chunks, so "table chunk in top-5"
+  could only ever be 0.
+- **Run 2**: transcriptions were added, but the manifest is processed in sorted
+  order and **none of the five eval papers' tables had been reached yet** — an
+  hour of transcription, none of it relevant to the metric.
+
+A metric that can only return zero returns zero and prints a verdict. Guarded
+with a `--papers` flag so ordering cannot silently produce a vacuous read again.
+
+### What the remaining 3 failures need
+
+Not a parser. The observed top hit for a structure-dependent query is prose
+*referencing* the table — "we compare them against our benchmark in Table 1" —
+and retrieval is behaving correctly: that sentence genuinely is the best semantic
+match for the question. It just does not contain the answer.
+
+So the fix is to resolve the reference rather than outrank it: when a retrieved
+chunk cites `Table N` of paper X and that table exists, attach it. Findability is
+already 83%, so this rides a signal that works instead of fighting one that does
+not. Not yet built.
+
 ## Security: indirect prompt injection
 
 An indexed paper about hallucination evaluation reproduces its prompt templates

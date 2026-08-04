@@ -55,10 +55,54 @@ CASES = Path(__file__).parent.parent / "evals" / "table_cases.json"
 @click.command()
 @click.option("--k", default=5, help="Depth for both metrics.")
 @click.option("--show-miss", is_flag=True, help="Print the top hit for failures.")
-def main(k, show_miss):
+@click.option("--with-markdown", is_flag=True,
+              help="Add VLM table transcriptions to a THROWAWAY index copy and "
+                   "re-measure. The live index is never touched.")
+def main(k, show_miss, with_markdown):
     cases = json.loads(CASES.read_text())
     cfg = Config()
-    index = PaperIndex(cfg)
+
+    tmp = None
+    if with_markdown:
+        # Copy the index, exactly as eval_figures.py does. Measuring on a copy is
+        # what makes this reversible: a technique gets adopted because a number
+        # moved, not because it is already installed.
+        import shutil
+        import tempfile
+
+        md_path = cfg.data_dir / "figures" / "tables_md.json"
+        manifest = json.loads((cfg.data_dir / "figures" / "manifest.json").read_text())
+        md = json.loads(md_path.read_text()) if md_path.exists() else {}
+        if not md:
+            raise SystemExit("no transcriptions; run scripts/transcribe_tables.py")
+
+        tmp = Path(tempfile.mkdtemp(prefix="tbl_eval_"))
+        shutil.copytree(cfg.chroma_dir, tmp / "chroma")
+        shutil.copytree(cfg.bm25_dir, tmp / "bm25")
+        cfg.chroma_dir, cfg.bm25_dir = tmp / "chroma", tmp / "bm25"
+
+        from arxiv_rag.parse import Chunk
+        index = PaperIndex(cfg)
+        known = {a.split("v")[0] for a in index.indexed_papers()}
+        by_id = {f["figure_id"]: f for f in manifest}
+        chunks = []
+        for fid, rec in md.items():
+            f = by_id.get(fid)
+            if not f or f["arxiv_id"].split("v")[0] not in known:
+                continue
+            chunks.append(Chunk(
+                chunk_id=f"{fid}-md", arxiv_id=f["arxiv_id"], title="",
+                authors="", published="", section=f["label"],
+                # Caption FIRST so the chunk keeps the author's precise wording,
+                # then the transcribed grid. The figure ablation showed that
+                # burying a caption under generated prose costs recall.
+                text=f"{f['label']}: {f['caption']}\n{rec['markdown']}",
+                chunk_index=0))
+        with index.batch():
+            added = index.add_chunks(chunks)
+        click.echo(f"+{added} transcribed tables into a throwaway index copy")
+    else:
+        index = PaperIndex(cfg)
 
     hits_by_case: dict[str, list] = {}
 
@@ -75,25 +119,75 @@ def main(k, show_miss):
     click.echo(f"{'MRR':<26}{res['mrr']:>10.4f}")
 
     # Answerability — only over cases with verified anchors.
+    #
+    # ALSO records WHERE the table chunk landed, because `answerable@5` alone
+    # conflates two failures that need opposite fixes:
+    #
+    #   table chunk retrieved, anchor absent -> STRUCTURE problem. The chunk is
+    #       there and unreadable; a transcription fixes it.
+    #   table chunk never retrieved          -> RANKING problem. Transcription
+    #       cannot help, because the chunk never reaches the reader.
+    #
+    # The distinction is not cosmetic. The observed top hit for a
+    # structure-dependent query was PROSE REFERENCING the table
+    # ("...compare them against our benchmark in Table 1"), which is retrieval
+    # behaving correctly: a well-formed sentence embeds far better than
+    # "Property Attribute ... ✓ ✗ ✗ 300,000 ✗". If that is the whole story, the
+    # fix is to resolve the reference, not to improve the ranking.
     scored = [c for c in cases if c.get("answer_anchors")]
     answerable = 0
+    tbl_retrieved = 0
     rows = []
     for c in scored:
         hits = hits_by_case.get(c["query"], [])[:k]
         blob = " ".join(h["text"] for h in hits)
         found = [a for a in c["answer_anchors"] if a in blob]
         answerable += bool(found)
-        rows.append((c["id"], bool(found), found, hits))
 
-    click.echo(f"{'answerable@'+str(k):<26}{answerable/max(len(scored),1):>10.4f}"
+        # Did ANY table-derived chunk make the top-k, and at what rank?
+        t_rank = None
+        for i, h in enumerate(hits, 1):
+            cid = str(h.get("chunk_id", ""))
+            sect = str(h.get("section", ""))
+            if "-table" in cid or sect.lower().startswith("table"):
+                t_rank = i
+                break
+        tbl_retrieved += t_rank is not None
+        rows.append((c["id"], bool(found), found, hits, t_rank))
+
+    n_sc = max(len(scored), 1)
+    click.echo(f"{'answerable@'+str(k):<26}{answerable/n_sc:>10.4f}"
                f"   ({answerable}/{len(scored)} anchored cases)")
+    click.echo(f"{'table chunk in top-'+str(k):<26}{tbl_retrieved/n_sc:>10.4f}"
+               f"   ({tbl_retrieved}/{len(scored)})")
 
-    click.echo(f"\n{'case':<36}{'found?':>8}{'answer?':>9}")
+    click.echo(f"\n{'case':<34}{'paper?':>8}{'tbl@':>6}{'answer?':>9}  diagnosis")
     by_id = {r["id"]: r for r in res["per_case"]}
-    for cid, ok, found, _ in rows:
+    diag_counts = {"structure": 0, "ranking": 0, "ok": 0, "not found": 0}
+    for cid, ok, found, _, t_rank in rows:
         f = "yes" if by_id[cid]["chunk_rank"] else "NO"
         a = "yes" if ok else "NO"
-        click.echo(f"{cid:<36}{f:>8}{a:>9}")
+        if ok:
+            d = "ok"
+        elif f == "NO":
+            d = "not found"
+        elif t_rank is not None:
+            d = "structure"          # table chunk arrived, data unreadable
+        else:
+            d = "ranking"            # table chunk never surfaced
+        diag_counts[d] += 1
+        click.echo(f"{cid:<34}{f:>8}{str(t_rank or '-'):>6}{a:>9}  {d}")
+
+    click.echo(f"\nFAILURE SPLIT  structure={diag_counts['structure']}  "
+               f"ranking={diag_counts['ranking']}  "
+               f"paper-not-found={diag_counts['not found']}  ok={diag_counts['ok']}")
+    if diag_counts["ranking"] > diag_counts["structure"]:
+        click.echo("  -> RANKING dominates. A better table PARSER cannot fix this; "
+                   "the table chunk never reaches the reader. Resolve the "
+                   "'see Table N' reference instead of trying to outrank prose.")
+    elif diag_counts["structure"] > 0:
+        click.echo("  -> STRUCTURE dominates. The chunk arrives and is unreadable, "
+                   "which is exactly what a transcription fixes.")
 
     unscored = [c["id"] for c in cases if not c.get("answer_anchors")]
     if unscored:
@@ -102,11 +196,16 @@ def main(k, show_miss):
 
     if show_miss:
         click.echo("\n--- cases found but NOT answerable: what came back instead ---")
-        for cid, ok, _, hits in rows:
+        for cid, ok, _, hits, _t in rows:
             if ok or not by_id[cid]["chunk_rank"] or not hits:
                 continue
             t = " ".join(hits[0]["text"].split())
             click.echo(f"\n{cid}\n  {hits[0]['arxiv_id']}  {t[:240]}")
+
+    if tmp:
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+        click.echo(f"\nremoved {tmp} (throwaway index copy)")
 
     click.echo(
         "\nRead this as: retrieval finds the right PAPER for table questions, but "
