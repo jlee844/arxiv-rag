@@ -215,6 +215,72 @@ def _column_floor(blocks, caption_rect: fitz.Rect, page_rect: fitz.Rect) -> floa
     return floor
 
 
+def _column_span(blocks, page_rect: fitz.Rect, caption_rect: fitz.Rect
+                 ) -> tuple[float, float]:
+    """Horizontal bounds of the column the caption sits in.
+
+    A table is routinely WIDER than its caption, so the band's x-extent has to
+    be grown from the table's own text. But growing it unbounded merges the
+    neighbouring column on a two-column paper, which is worse than clipping.
+
+    Two-column is detected from body prose, not assumed: if at least three prose
+    blocks sit entirely left of the page midline and at least three entirely
+    right of it, the page is two-column. A caption wider than 60% of the page is
+    a spanning (table*) caption and gets the full width regardless.
+    """
+    mid = (page_rect.x0 + page_rect.x1) / 2.0
+    if caption_rect.width > 0.60 * page_rect.width:
+        return page_rect.x0, page_rect.x1
+    left = right = 0
+    for r, t in blocks:
+        if not _is_body_sentence(t):
+            continue
+        if r.x1 <= mid:
+            left += 1
+        elif r.x0 >= mid:
+            right += 1
+    if left >= 3 and right >= 3:
+        c = (caption_rect.x0 + caption_rect.x1) / 2.0
+        return (page_rect.x0, mid) if c <= mid else (mid, page_rect.x1)
+    return page_rect.x0, page_rect.x1
+
+
+def _band_x_extent(blocks, y0: float, y1: float, x0: float, x1: float,
+                   lo: float, hi: float) -> tuple[float, float]:
+    """Grow [x0, x1] to cover every text block inside the vertical band.
+
+    THE BUG THIS FIXES: the band's width came from the CAPTION rect, so any
+    table wider than its caption was cut on both sides. Symptom was silent and
+    only visible by reading transcriptions -- row labels came back as
+    "gram, 1.1B n-grams" (from "Interpolated KN 5-gram, 1.1B n-grams") and
+    "hical Softmax MaxEnt 4-gram" (from "Hierarchical Softmax ..."). The VLM was
+    transcribing faithfully; the crop was wrong. Measured over 60 tables:
+    128/331 blocks (39%) extended outside the crop, overhangs up to 285 pt.
+
+    It matters more than cosmetics because the leftmost column carries the ROW
+    LABELS -- the thing that binds a number to its meaning, and the thing the
+    transcription prompt names explicitly in order to recover.
+
+    Growth is iterative and gap-limited: a block joins only if it already
+    overlaps the running extent (or nearly does), so an unrelated block across a
+    gutter cannot pull the band open. `lo`/`hi` clamp to the column.
+    """
+    x0, x1 = max(x0, lo), min(x1, hi)
+    inside = [r for r, _ in blocks
+              if r.y1 > y0 and r.y0 < y1 and r.x1 > lo and r.x0 < hi]
+    changed = True
+    while changed:
+        changed = False
+        for r in inside:
+            if r.x1 < x0 - 12.0 or r.x0 > x1 + 12.0:
+                continue
+            nx0, nx1 = max(min(x0, r.x0), lo), min(max(x1, r.x1), hi)
+            if nx0 < x0 - 0.01 or nx1 > x1 + 0.01:
+                x0, x1 = nx0, nx1
+                changed = True
+    return x0, x1
+
+
 def _text_density(page, band: fitz.Rect) -> int:
     """Characters of text inside `band`. A table is dense text, not drawings."""
     n = 0
@@ -362,6 +428,13 @@ def extract_figures(
                     if not cands:
                         continue
                     band = max(cands, key=lambda b: _text_density(page, b))
+                    # Widen to the table's own extent. The caption's width was
+                    # the bug (see _band_x_extent): tables are routinely wider
+                    # than their captions and were being clipped on both sides.
+                    lo, hi = _column_span(blocks, page_rect, rect)
+                    bx0, bx1 = _band_x_extent(blocks, band.y0, band.y1,
+                                              band.x0, band.x1, lo, hi)
+                    band = fitz.Rect(bx0, band.y0, bx1, band.y1)
                     # A table is dense text, so the figure test (drawings or
                     # images present) is the wrong validation entirely — most
                     # tables have neither. Require characters instead.
