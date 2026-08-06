@@ -1,6 +1,8 @@
 # Evaluation
 
-Measured on Apple Silicon (M4 Max, 36 GB). Corpus: **109 papers / 2960 chunks**.
+Measured on Apple Silicon (M4 Max, 36 GB). Corpus: **116 papers / 3801 chunks**
+(text + figure captions). The header previously read 109/2960, which was stale
+by two corpus expansions.
 
 Cases: `evals/retrieval_cases.json` · runner: `scripts/eval_recall.py` ·
 latency: `scripts/bench_latency.py`
@@ -35,6 +37,111 @@ Two anti-circularity rules the set is built on:
 
 ⚠️ The 61 auto-triaged cases were **not read individually**. Numbers below
 should be read as "auto-generated and triaged", not "hand-validated".
+
+## Standard benchmarks (BEIR + LitSearch + QASPER + BRIGHT)
+
+Everything else in this file is measured on 145 cases that I wrote and then
+tuned the retriever against. Honestly computed, and **not defensible to a
+skeptic**: cases written by the tuner encode assumptions the retriever already
+satisfies, which is how a metric reaches 98.97%.
+
+This section is the answer to "who wrote your eval?" — someone else's corpora,
+someone else's queries, someone else's metric, scored by `pytrec_eval` rather
+than by code of mine.
+
+| dataset | docs | queries | BM25 | dense | hybrid | published BM25 | best |
+|---|---|---|---|---|---|---|---|
+| SciFact | 5,183 | 300 | 0.6857 | 0.6451 | **0.7120** | 0.665 | hybrid |
+| NFCorpus | 3,633 | 323 | 0.3235 | 0.3164 | **0.3493** | 0.325 | hybrid |
+| SCIDOCS | 25,657 | 1,000 | 0.1572 | **0.2164** | 0.2033 | 0.158 | dense |
+| QASPER | 18,173 | 1,260 | 0.1415 | 0.1047 | **0.1460** | — | hybrid |
+| LitSearch | 64,183 | 597 | 0.4125 | 0.3540 | **0.4606** | — | hybrid |
+| BRIGHT-bio | 57,359 | 103 | 0.0747 | **0.1365** | 0.1122 | — | dense |
+
+nDCG@10, retrieval depth 100, reranking off (shipped default).
+
+### The harness reproduces published baselines
+
+Our BM25 lands at 0.6857 / 0.3235 / 0.1572 against the BEIR paper's 0.665 /
+0.325 / 0.158. Matching a published number on three independent datasets is the
+strongest available evidence that the scoring is right — and it is a check the
+hand-built eval structurally cannot perform, because there is nothing to
+reproduce.
+
+`scripts/eval_beir.py` treats a BM25 score far ABOVE published as a **bug
+signal** (relevance leakage, id mismatch), not a win.
+
+### The hybrid claim was too strong, and the correction has a mechanism
+
+Hybrid wins **exactly** when BM25 >= dense, and loses **exactly** when dense >
+BM25. Six datasets, no exceptions. In both losses hybrid lands *between* the two
+arms — SCIDOCS 0.2033 between 0.157 and 0.216; BRIGHT 0.1122 between 0.075 and
+0.137 — which is what equal-weight RRF does: it averages rankings, so it drags
+the stronger retriever toward the weaker one.
+
+**This confirms a diagnosis already in this file at n=6.** The `capability`
+slice above is the one place the in-house eval saw fusion lose to dense (0.867
+vs 0.889), and the stated cause was "BM25 has no lexical signal to find... RRF
+then lets that noise pull hybrid below dense." That was 6 cases and could not be
+resolved from noise. BEIR reproduces the same mechanism at 1,000+ queries on
+whole corpora where BM25 is weak.
+
+So the honest claim is not "hybrid RRF is better". It is:
+
+> **Equal-weight RRF helps only when the lexical arm is competitive with the
+> dense arm. Where BM25 collapses, fusion costs quality.**
+
+### Weighted fusion does NOT rescue it
+
+SCIDOCS, sweeping the BM25 weight (`scripts/fusion_sweep.py`):
+
+| w_bm25 | 0.0 | 0.1 | 0.3 | **0.5 (shipped)** | 0.7 | 1.0 |
+|---|---|---|---|---|---|---|
+| nDCG@10 | 0.2164 | 0.2165 | 0.2102 | **0.2026** | 0.1905 | 0.1572 |
+
+Monotonic decline in BM25 weight. The best blend beats dense-only by **+0.0001**,
+which is noise. **No weighting recovers the loss** — on a corpus where BM25 is
+weak the right move is to pick the arm, not tune the mix.
+
+(The first version of that script declared "a weighted blend BEATS both single
+arms" off that +0.0001, because its threshold was 1e-6. Fixed to 0.005. Noise
+dressed as a result is the exact failure this section exists to remove.)
+
+Swept across four datasets, the pattern is consistent:
+
+| dataset | dense | BM25 | equal 0.5 | best w | best | gain vs best single arm |
+|---|---|---|---|---|---|---|
+| SciFact | 0.6451 | 0.6857 | 0.7141 | **0.7** | 0.7179 | **+0.0322** |
+| LitSearch | 0.3540 | 0.4125 | 0.4629 | **0.7** | 0.4677 | **+0.0552** |
+| SCIDOCS | 0.2164 | 0.1572 | 0.2026 | 0.1 | 0.2165 | +0.0001 |
+| BRIGHT-bio | 0.1365 | 0.0747 | 0.1118 | 0.0 | 0.1365 | +0.0000 |
+
+Two separate conclusions:
+
+1. **Where BM25 collapses, no weight helps.** SCIDOCS and BRIGHT decline
+   monotonically in BM25 weight; the optimum is pure dense. Arm *selection*, not
+   mixing.
+2. **Where fusion works, 0.5 is not the best weight — and 0.7 is, on both.**
+   Two unrelated corpora peak at the same value, for ~+0.004 each. That
+   transfers, which makes it more interesting than per-dataset tuning.
+
+**Not adopted yet.** w=0.7 was chosen using test labels on two datasets. Two
+points agreeing is suggestive, not established; NFCorpus and QASPER should be
+swept before `Config.rrf` changes, and even then it is a defensible default
+rather than a proven optimum.
+
+### Honest limits of this section
+
+- **These corpora are text-only.** The figure, table and multimodal work cannot
+  be validated this way and remains measured on the purpose-built corpus. The
+  claim is "retrieval quality is validated on standard benchmarks; multimodal
+  and safety work is validated in-house", not that everything moved.
+- **QASPER, LitSearch and BRIGHT have no published BM25 here**, so they get no
+  reproduction guarantee — only the three BEIR sets do.
+- **BRIGHT is one domain** (biology) of eleven.
+- **Absolute numbers look worse than the in-house ones and that is the point.**
+  0.712 nDCG@10 on SciFact is a more credible statement than 98.97% recall@5 on
+  cases I wrote.
 
 ## Retriever ablation
 

@@ -30,6 +30,28 @@ split is the entire argument for hybrid, and it only became visible after the
 eval set grew from 15 to 76 cases — at n=15 all three tied at 93.33%, because
 one case was worth 6.7pp and the effect being measured is 2.6pp.
 
+**But I wrote those cases, so here is the same code on six benchmarks I did
+not** — SciFact, NFCorpus, SCIDOCS, QASPER, LitSearch, BRIGHT, scored with
+`pytrec_eval`:
+
+| dataset | BM25 | dense | hybrid | published BM25 |
+|---|---|---|---|---|
+| SciFact | 0.6857 | 0.6451 | **0.7120** | 0.665 |
+| NFCorpus | 0.3235 | 0.3164 | **0.3493** | 0.325 |
+| SCIDOCS | 0.1572 | **0.2164** | 0.2033 | 0.158 |
+| QASPER | 0.1415 | 0.1047 | **0.1460** | — |
+| LitSearch | 0.4125 | 0.3540 | **0.4606** | — |
+| BRIGHT-bio | 0.0747 | **0.1365** | 0.1122 | — |
+
+Our BM25 reproduces published BM25 on all three BEIR sets, which is the check
+an eval I wrote myself can never provide.
+
+**And it corrects the claim above.** Hybrid wins exactly when BM25 >= dense and
+loses exactly when dense > BM25 — 6/6. Equal-weight RRF averages rankings, so
+it drags the stronger retriever toward the weaker one. Weighted fusion does not
+rescue it: on SCIDOCS the curve declines monotonically in BM25 weight. So:
+*equal-weight RRF helps only when the lexical arm is competitive.*
+
 The `capability` slice is where that argument stops holding: those queries name
 an ability ("physical properties like mass and friction") while every candidate
 paper is topically identical, so BM25 has nothing to match (MRR 0.611) and RRF
