@@ -1,0 +1,19 @@
+{
+  "n": 650,
+  "source": "local (arxiv-rag figures, cached Phase 2 descriptions)",
+  "caption_tokens": 31.276923076923076,
+  "desc_tokens": 68.73384615384616,
+  "caption_share": 0.27383657619907187,
+  "rare_density_caption": 0.6845811313515127,
+  "rare_density_cap_desc": 0.18971487120106897,
+  "known_item": {
+    "caption_only": {
+      "r@1": 0.9215384615384615,
+      "r@5": 0.9815384615384616
+    },
+    "caption_desc": {
+      "r@1": 0.9,
+      "r@5": 0.9692307692307692
+    }
+  }
+}

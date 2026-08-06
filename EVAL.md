@@ -107,28 +107,36 @@ weak the right move is to pick the arm, not tune the mix.
 arms" off that +0.0001, because its threshold was 1e-6. Fixed to 0.005. Noise
 dressed as a result is the exact failure this section exists to remove.)
 
-Swept across four datasets, the pattern is consistent:
+Swept across all six datasets:
 
-| dataset | dense | BM25 | equal 0.5 | best w | best | gain vs best single arm |
+| dataset | dense | BM25 | equal 0.5 | **w=0.7** | argmax w | gain vs best single arm |
 |---|---|---|---|---|---|---|
-| SciFact | 0.6451 | 0.6857 | 0.7141 | **0.7** | 0.7179 | **+0.0322** |
-| LitSearch | 0.3540 | 0.4125 | 0.4629 | **0.7** | 0.4677 | **+0.0552** |
-| SCIDOCS | 0.2164 | 0.1572 | 0.2026 | 0.1 | 0.2165 | +0.0001 |
-| BRIGHT-bio | 0.1365 | 0.0747 | 0.1118 | 0.0 | 0.1365 | +0.0000 |
+| SciFact | 0.6451 | 0.6857 | 0.7141 | **0.7179** | 0.7 | **+0.0322** |
+| LitSearch | 0.3540 | 0.4125 | 0.4629 | **0.4677** | 0.7 | **+0.0552** |
+| NFCorpus | 0.3164 | 0.3311 | 0.3519 | **0.3524** | 0.6 | **+0.0225** |
+| QASPER | 0.1047 | 0.1415 | 0.1469 | **0.1514** | 0.7 | **+0.0099** |
+| SCIDOCS | 0.2164 | 0.1572 | 0.2026 | 0.1905 | 0.1 | +0.0001 |
+| BRIGHT-bio | 0.1365 | 0.0747 | 0.1118 | 0.0993 | 0.0 | +0.0000 |
 
-Two separate conclusions:
+Two separate conclusions, one an order of magnitude bigger than the other:
 
-1. **Where BM25 collapses, no weight helps.** SCIDOCS and BRIGHT decline
-   monotonically in BM25 weight; the optimum is pure dense. Arm *selection*, not
-   mixing.
-2. **Where fusion works, 0.5 is not the best weight — and 0.7 is, on both.**
-   Two unrelated corpora peak at the same value, for ~+0.004 each. That
-   transfers, which makes it more interesting than per-dataset tuning.
+1. **Where BM25 collapses, no weight helps — and the fix is large.** SCIDOCS and
+   BRIGHT decline monotonically in BM25 weight; the optimum is pure dense, worth
+   **+0.014 and +0.025** over equal weighting. Arm *selection*, not mixing.
+2. **Where fusion works, w=0.7 beats equal weighting on 4 of 4**, by +0.0038,
+   +0.0048, +0.0005, +0.0045 (mean +0.0034). Small, consistent, free.
 
-**Not adopted yet.** w=0.7 was chosen using test labels on two datasets. Two
-points agreeing is suggestive, not established; NFCorpus and QASPER should be
-swept before `Config.rrf` changes, and even then it is a defensible default
-rather than a proven optimum.
+> A note on how conclusion 2 was nearly missed. Comparing ARGMAX weights gives
+> 0.7 / 0.7 / 0.6 / 0.7, which reads as "no single constant" — and that was the
+> first reading. But the right question is not where each curve peaks, it is
+> whether one fixed weight beats the shipped one everywhere. NFCorpus's argmax of
+> 0.6 puts w=0.7 just 0.0012 below its own optimum, which is noise. Argmax
+> jitter is not disagreement.
+
+**Still not adopted.** Every weight here was scored against test labels, so
++0.0034 is an oracle-flavoured gain on six datasets, not a validated default.
+The honest status: a defensible candidate for `Config.rrf`, worth far less than
+conclusion 1, and it should be confirmed on a held-out dataset before shipping.
 
 ### Honest limits of this section
 
@@ -488,7 +496,36 @@ they do to the chunk.
 **Mechanism: dilution.** A caption is short and specific. Appending 3-4 sentences
 of description floods the chunk with high-frequency generic vocabulary ("image",
 "plot", "axis", "shows"), which lowers BM25 term specificity and drags the
-embedding toward generic chart semantics. The chunk matches more queries and
+embedding toward generic chart semantics.
+
+**The mechanism is now measured at n=650, not asserted.** The recall numbers
+above rest on **14 hand-written figure cases**, where one case is worth 7pp —
+which made this the least defensible claim in the file once retrieval got
+outside validation. Dilution, unlike recall, is a property of the TEXT and needs
+no queries at all, so it can be measured on every described figure
+(`scripts/eval_scicap.py --source local`, n=650):
+
+| | caption only | + VLM description |
+|---|---|---|
+| tokens | 31.3 | 100.0 |
+| caption share of indexed text | 100% | **27.4%** |
+| rare-token density | 68.5% | **19.0%** |
+| known-item recall@1 | 0.922 | 0.900 (−0.022) |
+| known-item recall@5 | 0.982 | 0.969 (−0.012) |
+
+"Rare" = a token appearing in <5% of captions, i.e. the discriminative tokens
+retrieval keys on. **Their density falls 72.3%.** The description is 2.2x longer
+than the caption, so the caption becomes barely a quarter of the indexed text.
+Known-item queries are the first 60% of each caption — mechanical truncation, so
+no query here is authored by me.
+
+**What this does and does not settle.** The mechanism is confirmed and large.
+The *consequence* is smaller than the headline suggests: −0.012 at recall@5 on
+the known-item task, against a 72% collapse in discriminative density. The
+original 100% → 85.7% magnitude remains unreproduced, and at n=14 it was never
+resolvable. Honest status: **direction and cause established at n=650; magnitude
+uncertain.** Still this corpus, not outside data — SciCap would supply that, at
+the cost of a 23.3 GB multi-part image download. The chunk matches more queries and
 ranks worse on the right one.
 
 One signal survives and points somewhere useful: `paraphrase` improved **+0.027**
