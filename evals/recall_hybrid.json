@@ -12,7 +12,7 @@
     "tokenizer": "ac3c64ee9a22407a",
     "chroma_mtime": 1785812184,
     "chroma_bytes": 68425208,
-    "embed_device": "cpu",
+    "embed_device": "mps(auto)",
     "top_k": 8,
     "final_k": 5,
     "min_relevance": 0.35

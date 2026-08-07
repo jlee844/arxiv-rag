@@ -157,7 +157,17 @@ def corpus_fingerprint(index, cfg) -> dict:
             tf = pth / tok
             if tf.exists():
                 fp["tokenizer"] = hashlib.sha256(tf.read_bytes()).hexdigest()[:16]
-    fp["embed_device"] = cfg.embed_device
+    # RESOLVED device, not the config value. `embed_device=None` means "auto",
+    # so recording it verbatim made a CPU run and an MPS run indistinguishable
+    # in the artifact -- which is exactly what the fingerprint exists to prevent.
+    dev = cfg.embed_device
+    if dev is None:
+        try:
+            import torch
+            dev = "mps(auto)" if torch.backends.mps.is_available() else "cpu(auto)"
+        except Exception:                                    # noqa: BLE001
+            dev = "auto(unresolved)"
+    fp["embed_device"] = dev
     fp["top_k"] = getattr(cfg, "top_k", None)
     fp["final_k"] = getattr(cfg, "final_k", None)
     fp["min_relevance"] = getattr(cfg, "min_relevance", None)
