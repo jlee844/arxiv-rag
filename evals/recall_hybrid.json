@@ -1,0 +1,29 @@
+{
+  "mode": "hybrid",
+  "k": 5,
+  "n_cases": 119,
+  "tag": null,
+  "gate": false,
+  "use_rerank": false,
+  "corpus": {
+    "n_chunks": 3801,
+    "bm25_mtime": 1785812185,
+    "bm25_bytes": 11657944,
+    "tokenizer": "ac3c64ee9a22407a",
+    "chroma_mtime": 1785812184,
+    "chroma_bytes": 68425208,
+    "embed_device": "cpu",
+    "top_k": 8,
+    "final_k": 5,
+    "min_relevance": 0.35
+  },
+  "summary": {
+    "mode": "hybrid",
+    "recall": 0.9896907216494846,
+    "mrr": 0.9396907216494846,
+    "hits": 96,
+    "n": 97,
+    "neg_mean": 0.024161818181818184,
+    "neg_n": 22
+  }
+}

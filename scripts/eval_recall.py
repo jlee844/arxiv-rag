@@ -113,6 +113,65 @@ def score_run(data, index, cfg, mode: str = "hybrid", verbose: bool = True) -> d
     }
 
 
+def corpus_fingerprint(index, cfg) -> dict:
+    """Pin the result to a corpus revision instead of to ambient disk state.
+
+    THE HEADLINE HAD NO ARTIFACT. This script printed to the console and wrote
+    nothing, so 98.97% recall@5 / MRR 0.940 existed only as prose in EVAL.md.
+    Re-ingest the 19 unindexed PDFs -- or anything else touching the index --
+    and every published number silently moves with no way to tell which corpus
+    produced which figure. That is the same class as the BEIR result file that a
+    5-query smoke run overwrote: results tied to whatever is on disk right now,
+    not to a revision.
+
+    Records what would change the numbers: chunk count, paper count, the BM25
+    tokenizer fingerprint (which already guards against a stale bm25.pkl
+    silently degrading retrieval to dense-only), and file mtimes/sizes.
+    """
+    import hashlib
+    import os
+
+    fp: dict = {}
+    try:
+        fp["n_chunks"] = int(index.count())
+    except Exception as e:                                   # noqa: BLE001
+        fp["n_chunks"] = f"unavailable: {type(e).__name__}"
+    for attr in ("papers", "_papers", "metadatas"):
+        v = getattr(index, attr, None)
+        if isinstance(v, (list, dict)):
+            fp["n_papers"] = len(v)
+            break
+    tok = getattr(index, "TOKENIZER_FILE", None)
+    for name, path in (("bm25", getattr(cfg, "bm25_dir", None)),
+                       ("chroma", getattr(cfg, "chroma_dir", None))):
+        if not path:
+            continue
+        pth = Path(path)
+        if pth.exists():
+            newest = max((f.stat().st_mtime for f in pth.rglob("*") if f.is_file()),
+                         default=0)
+            size = sum(f.stat().st_size for f in pth.rglob("*") if f.is_file())
+            fp[f"{name}_mtime"] = int(newest)
+            fp[f"{name}_bytes"] = size
+        if tok and name == "bm25":
+            tf = pth / tok
+            if tf.exists():
+                fp["tokenizer"] = hashlib.sha256(tf.read_bytes()).hexdigest()[:16]
+    fp["embed_device"] = cfg.embed_device
+    fp["top_k"] = getattr(cfg, "top_k", None)
+    fp["final_k"] = getattr(cfg, "final_k", None)
+    fp["min_relevance"] = getattr(cfg, "min_relevance", None)
+    return fp
+
+
+def write_result(payload: dict, stem: str) -> None:
+    """Persist a run. Console output is not a record."""
+    out = CASES.parent / f"{stem}.json"
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2, default=str) + "\n")
+    click.echo(f"\nwrote {out}")
+
+
 def print_summary(r: dict, k: int) -> None:
     click.echo("─" * 60)
     click.echo(f"[{r['mode']}]  recall@{k}: {r['hits']}/{r['n']} = {r['recall']:.2%}")
@@ -233,6 +292,13 @@ def main(k, cases, tag, mode, ablate, rrf_k_sweep, device, use_rerank, gate, rep
             r["mode"] = f"rrf_k={val}"
             runs.append(r)
         print_ablation(runs, cfg.final_k)
+        write_result({"mode": "ablate", "k": cfg.final_k, "n_cases": len(data),
+                      "tag": tag, "repeat": repeat,
+                      "corpus": corpus_fingerprint(index, cfg),
+                      "arms": {m: {kk: vv for kk, vv in r.items()
+                                   if not isinstance(vv, (list, dict))}
+                               for m, r in zip(("dense", "bm25", "hybrid"), runs)}},
+                     f"recall_ablate" + (f"_{tag}" if tag else ""))
         return
 
     if ablate:
@@ -242,6 +308,13 @@ def main(k, cases, tag, mode, ablate, rrf_k_sweep, device, use_rerank, gate, rep
         for r in runs:
             print_summary(r, cfg.final_k)
         print_ablation(runs, cfg.final_k)
+        write_result({"mode": "ablate", "k": cfg.final_k, "n_cases": len(data),
+                      "tag": tag, "repeat": repeat,
+                      "corpus": corpus_fingerprint(index, cfg),
+                      "arms": {m: {kk: vv for kk, vv in r.items()
+                                   if not isinstance(vv, (list, dict))}
+                               for m, r in zip(("dense", "bm25", "hybrid"), runs)}},
+                     f"recall_ablate" + (f"_{tag}" if tag else ""))
         if repeat > 1:
             click.echo(f"determinism over {repeat} runs (device={device}):")
             for i, m in enumerate(("dense", "bm25", "hybrid")):
@@ -252,7 +325,14 @@ def main(k, cases, tag, mode, ablate, rrf_k_sweep, device, use_rerank, gate, rep
                            f"MRR {min(mr):.3f}..{max(mr):.3f}{flag}")
         return
 
-    print_summary(score_run(data, index, cfg, mode, verbose=True), cfg.final_k)
+    res = score_run(data, index, cfg, mode, verbose=True)
+    print_summary(res, cfg.final_k)
+    write_result({"mode": mode, "k": cfg.final_k, "n_cases": len(data),
+                  "tag": tag, "gate": gate, "use_rerank": use_rerank,
+                  "corpus": corpus_fingerprint(index, cfg),
+                  "summary": {kk: vv for kk, vv in res.items()
+                              if not isinstance(vv, (list, dict))}},
+                 f"recall_{mode}" + (f"_{tag}" if tag else ""))
 
 
 if __name__ == "__main__":
