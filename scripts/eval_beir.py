@@ -69,9 +69,10 @@ def _load(dataset: str):
 @click.command()
 @click.option("--dataset", default="scifact")
 @click.option("--depth", default=100, help="Retrieval depth; recall@100 needs 100.")
-@click.option("--limit", type=int, default=None, help="Only N judged queries (smoke).")
+@click.option("--limit", type=int, default=None, help="Only N judged queries (smoke). Writes to beir_<ds>.limit<N>.json, never the canonical file.")
+@click.option("--force", is_flag=True, help="Allow a smaller run to overwrite a larger one.")
 @click.option("--rebuild", is_flag=True, help="Force re-embed even if cached.")
-def main(dataset, depth, limit, rebuild):
+def main(dataset, depth, limit, force, rebuild):
     import pytrec_eval
 
     from arxiv_rag.config import Config
@@ -171,13 +172,54 @@ def main(dataset, depth, limit, rebuild):
         click.echo(f"{'[published BM25]':<10}{ref['BM25']:>10.3f}"
                    f"{'':>13}{'':>9}   {ref['note']}")
 
-    out = ROOT / "evals" / f"beir_{dataset}.json"
+    # PROVISIONAL RUNS MUST NOT OVERWRITE FULL ONES.
+    #
+    # This happened. `evals/beir_scidocs.json` was found holding an n=5 smoke run
+    # (BM25 nDCG@10 0.2291 vs published 0.158 -- 1.45x, ABOVE this script's own
+    # bug threshold) while EVAL.md still cited 0.1572/0.2164/0.2033 from the full
+    # 1000-query run that the smoke run had silently replaced. The published
+    # numbers were no longer reproducible from the artifact on disk.
+    #
+    # The bug-signal check below DID fire at the time -- to the console, after
+    # the write. A warning that scrolls past while the corruption persists on
+    # disk is not a guard. Two changes:
+    #   1. a --limit run writes to its own filename, never the canonical one
+    #   2. a smaller run refuses to clobber a larger one without --force
+    verdict = None
+    if ref:
+        _got = results["bm25"]["ndcg_cut_10"]
+        if _got > ref["BM25"] * 1.25:
+            verdict = f"SUSPECT: BM25 {_got:.4f} is {_got/ref['BM25']:.2f}x published"
+        elif _got < ref["BM25"] * 0.6:
+            verdict = f"SUSPECT: BM25 {_got:.4f} is far BELOW published"
+        else:
+            verdict = f"plausible: BM25 {_got:.4f} vs published {ref['BM25']:.3f}"
+
+    stem = f"beir_{dataset}" + (f".limit{limit}" if limit else "")
+    out = ROOT / "evals" / f"{stem}.json"
     out.parent.mkdir(exist_ok=True)
+    if out.exists() and not limit:
+        try:
+            prev = json.loads(out.read_text()).get("n_queries", 0)
+        except Exception:                                    # noqa: BLE001
+            prev = 0
+        if prev > len(qids) and not force:
+            raise SystemExit(
+                f"REFUSING to overwrite {out}: it holds n_queries={prev} and "
+                f"this run has {len(qids)}. A smaller run must not replace a "
+                f"larger one -- that is how beir_scidocs.json came to hold a "
+                f"5-query smoke test while EVAL.md cited the 1000-query result. "
+                f"Pass --force if you mean it.")
+
     out.write_text(json.dumps({"dataset": dataset, "n_queries": len(qids),
                                "n_docs": len(corpus), "depth": depth,
+                               "limit": limit,
+                               "bm25_sanity": verdict,
                                "results": results,
                                "published_bm25": ref}, indent=2) + "\n")
     click.echo(f"\nwrote {out}")
+    if verdict and verdict.startswith("SUSPECT"):
+        click.echo(f"   ^ recorded in-file as: {verdict}")
 
     if ref:
         got = results["bm25"]["ndcg_cut_10"]
